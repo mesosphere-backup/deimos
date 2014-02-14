@@ -24,11 +24,19 @@ _subcommands = dict( (k, v) for k, v in _mod.__dict__.items()
 
 def format_help():
     return """
- USAGE: medea launch  <container-id> < taskInfo.pb
+ USAGE: medea launch  <container-id> (--mesos-executor /a/path)? < taskInfo.pb
         medea update  <container-id> < resources.pb
         medea usage   <container-id>
         medea wait    <container-id>
         medea destroy <container-id>
+
+  Medea provides Mesos integration for Docker, allowing Docker to be used as
+  an external containerizer.
+
+  In the first form, launches a container based on the TaskInfo passed on
+  standard in. In the second form, updates a container's resources. The
+  remaining forms are effectively no-ops, returning 0 and sending back 0 bytes
+  of data, allowing Mesos to use its default behaviour.
 """.strip("\n")
 
 def cli(argv):
