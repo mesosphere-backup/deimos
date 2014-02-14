@@ -1,2 +1,2 @@
-bin="`dirname "$0"`" && exec python "`dirname "$bin"`"/lib/medea.py "$@"
+bin="`dirname "$0"`" && exec python "`dirname "$bin"`"/src/medea.py "$@"
 # A convenience for development. Not installed or used in production.

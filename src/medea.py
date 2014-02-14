@@ -1,6 +1,8 @@
 import inspect
 import sys
 
+import medea.mesos_pb2
+
 def launch(container_id):
     pass
 
