@@ -1,7 +1,12 @@
+#!/usr/bin/env python
 import inspect
 import sys
 
-import medea.mesos_pb2
+try:
+    import mesos_pb2                               # Prefer system installation
+except:
+    import medea.mesos_pb2
+
 
 def launch(container_id):
     pass
