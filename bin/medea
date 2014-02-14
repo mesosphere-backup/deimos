@@ -1,0 +1,7 @@
+#!/usr/bin/env python
+
+import medea
+
+if __name__ == "__main__":
+    medea.cli(sys.argv)
+
