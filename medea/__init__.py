@@ -127,12 +127,14 @@ def container_id_as_docker_name(container_id):
     return r
 
 
-def cli(argv):
+def cli(argv=None):
+    if argv is None: argv = sys.argv
+
     sub = argv[1] if len(argv) > 1 else None
 
     if sub in ["-h", "--help", "help"]:
         print format_help()
-        sys.exit(0)
+        return 0
 
     f = { "launch":  launch,
           "update":  update,
@@ -143,17 +145,19 @@ def cli(argv):
     if f is None:
         print >>sys.stderr, format_help()
         print >>sys.stderr, "** Please specify a subcommand **".center(79)
-        sys.exit(1)
+        return 1
 
     result = f(*argv[2:])
     if result is not None:
         if isinstance(result, int):
-            sys.exit(result)
+            return result
         if isinstance(result, str):
             sys.stdout.write(result)
         else:
             for item in result:
                 sys.stdout.write(str(item) + "\n")
+    return 0
+
 
 def format_help():
     return """
@@ -193,5 +197,5 @@ except:
 
 
 if __name__ == "__main__":
-    cli(sys.argv)
+    sys.exit(cli(sys.argv))
 
