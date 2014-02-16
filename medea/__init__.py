@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 try:
     import mesos_pb2 as protos                     # Prefer system installation
@@ -33,22 +34,13 @@ def launch(container_id, *args):
     for k, v in os.environ.items():
         run_options += [ "-e", "%s=%s" % (k,v) ]
 
-    daemon_argv = docker_private_daemon()
     runner_argv = docker_run(run_options + options, image, argv(task))
     if needs_executor_wrapper(task):
         if len(args) > 1 and args[0] == "--mesos-executor":
             runner_argv = [args[1]] + runner_argv
 
-    daemon = subprocess.Popen(in_sh(daemon_argv))
-    try:
-        runner = subprocess.Popen(in_sh(runner_argv))
-        runner_code = runner.wait()
-    finally:
-        daemon.terminate()
-    daemon_code = daemon.wait()
-    if daemon_code != 0:
-        msg = "!! Private daemon exited with an error (%d)" % daemon_code
-        print >>sys.stderr, msg
+    runner = subprocess.Popen(in_sh(runner_argv))
+    runner_code = runner.wait()
     return runner_code
 
 def update(container_id, *args):
@@ -59,13 +51,14 @@ def usage(container_id, *args):
 
 def wait(container_id, *args):
     name = container_id_as_docker_name(container_id)
-    socket = docker_private_socket()
+    time.sleep(1)
+    # Container hasn't started yet ... what do?
+    # Container started and terminated already ... what do?
     return subprocess.call(in_sh(docker(["wait", name])))
 
 def destroy(container_id, *args):
     exit = 0
     name = container_id_as_docker_name(container_id)
-    socket = docker_private_socket()
     for argv in [["stop", "-t=2", name], ["rm", name]]:
         try: subprocess.check_call(in_sh(docker(argv)))
         except subprocess.CalledProcessError as e:
@@ -75,18 +68,10 @@ def destroy(container_id, *args):
 
 
 def docker_run(options, image, command=[]):
-    socket = docker_private_socket()
     return docker(["run"] + options + [image] + command)
 
-def docker_private_daemon():
-    pidfile = "--pidfile=" + os.getcwd() + "/docker.pid"
-    return docker(["-d", pidfile])
-
-def docker_private_socket():
-    return "--host=unix://" + os.getcwd() + "/docker.sock"
-
 def docker(argv):
-    return ["docker", docker_private_socket()] + argv
+    return ["docker"] + argv
 
 def in_sh(argv):
     """
