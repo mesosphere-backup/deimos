@@ -40,6 +40,7 @@ def launch(container_id, *args):
             runner_argv = [args[1]] + runner_argv
 
     runner = subprocess.Popen(in_sh(runner_argv))
+    os.close(1)
     runner_code = runner.wait()
     return runner_code
 
