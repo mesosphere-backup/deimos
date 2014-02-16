@@ -47,14 +47,29 @@ def update(container_id, *args):
     pass
 
 def usage(container_id, *args):
+    # TODO: Use HTTP API to grab resources
     pass
 
 def wait(container_id, *args):
     name = container_id_as_docker_name(container_id)
-    time.sleep(1)
+    time.sleep(1) # Need to wait for container to start :(
     # Container hasn't started yet ... what do?
     # Container started and terminated already ... what do?
-    return subprocess.call(in_sh(docker(["wait", name])))
+    # docker ps --all can help...
+    wait = docker(["wait", name])
+    try:
+        info = subprocess.check_call(in_sh(wait, allstderr=False))
+    except subprocess.CalledProcessError as e:
+        print >>sys.stderr, "!! Bad exit code (%d):" % exit, wait
+        return e.returncode
+    try:
+        # TODO: Serialize exitcode to protobuf.
+        exitcode = int(info)
+        return 0
+    except ValueError as e:
+        print >>sys.stderr, "Failed to parse container exit %s: %s", info, e
+    return 1
+
 
 def destroy(container_id, *args):
     exit = 0
@@ -73,13 +88,14 @@ def docker_run(options, image, command=[]):
 def docker(argv):
     return ["docker"] + argv
 
-def in_sh(argv):
+def in_sh(argv, allstderr=True):
     """
     Provides better error messages in case of file not found or permission
     denied. Note that this has nothing at all to do with shell=True, since
     quoting prevents the shell from interpreting any arguments.
     """
-    return ["/bin/sh", "-c", 'echo ARGV: "$@" >&2 && exec "$@"', "sh"] + argv
+    call = 'exec "$@" 1>&2' if allstderr else 'exec "$@"'
+    return ["/bin/sh", "-c", 'echo ARGV: "$@" >&2 && ' + call, "sh"] + argv
 
 
 def fetch_command(task):
