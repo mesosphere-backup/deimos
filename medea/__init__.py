@@ -1,5 +1,7 @@
 #!/usr/bin/env python
+import base64
 import inspect
+import os
 import re
 import subprocess
 import sys
@@ -11,9 +13,10 @@ except:
 
 
 def launch(container_id, *args):
-    task = protos.TaskInfo.ParseFromString(sys.stdin.read())
+    task = protos.TaskInfo()
+    task.ParseFromString(sys.stdin.read())
     (url, options) = container(task)
-    pre, image = url.split("docker:///")[1]
+    pre, image = url.split("docker:///")
     if pre != "":
         raise Err("URL '%s' is not a valid docker:// URL!" % url)
     if image == "":
@@ -48,21 +51,23 @@ def launch(container_id, *args):
         print >>sys.stderr, msg
     return runner_code
 
-def update(container_id):
+def update(container_id, *args):
     pass
 
-def usage(container_id):
+def usage(container_id, *args):
     pass
 
-def wait(container_id):
+def wait(container_id, *args):
     name = container_id_as_docker_name(container_id)
-    return subprocess.call(in_sh(["docker", "wait", name]))
+    socket = docker_private_socket()
+    return subprocess.call(in_sh(docker(["wait", name])))
 
-def destroy(container_id):
+def destroy(container_id, *args):
     exit = 0
     name = container_id_as_docker_name(container_id)
-    for argv in [["docker", "stop", "-t=2", name], ["docker", "rm", name]]:
-        try: subprocess.check_call(in_sh(argv))
+    socket = docker_private_socket()
+    for argv in [["stop", "-t=2", name], ["rm", name]]:
+        try: subprocess.check_call(in_sh(docker(argv)))
         except subprocess.CalledProcessError as e:
             exit = e.returncode
             print >>sys.stderr, "!! Bad exit code (%d):" % exit, argv
@@ -71,15 +76,17 @@ def destroy(container_id):
 
 def docker_run(options, image, command=[]):
     socket = docker_private_socket()
-    return ["docker", socket, "run"] + options + [image] + command
+    return docker(["run"] + options + [image] + command)
 
-def docker_private_dameon():
+def docker_private_daemon():
     pidfile = "--pidfile=" + os.getcwd() + "/docker.pid"
-    socket = docker_private_socket()
-    return ["docker", "-d", socket, pidfile]
+    return docker(["-d", pidfile])
 
 def docker_private_socket():
     return "--host=unix://" + os.getcwd() + "/docker.sock"
+
+def docker(argv):
+    return ["docker", docker_private_socket()] + argv
 
 def in_sh(argv):
     """
@@ -87,7 +94,7 @@ def in_sh(argv):
     denied. Note that this has nothing at all to do with shell=True, since
     quoting prevents the shell from interpreting any arguments.
     """
-    return ["/bin/sh", "-c", 'exec "$@"', "sh"] + argv
+    return ["/bin/sh", "-c", 'echo ARGV: "$@" >&2 && exec "$@"', "sh"] + argv
 
 
 def fetch_command(task):
@@ -103,12 +110,12 @@ def fetch_container(task):
 def container(task):
     container = fetch_container(task)
     if container is not None:
-        return (container.image, container.options)
+        return (container.image, list(container.options))
     return ("docker:///", [])
 
 def argv(task):
     cmd = fetch_command(task)
-    if cmd.HasField("value") and value != "":
+    if cmd.HasField("value") and cmd.value != "":
         return ["sh", "-c", cmd.value]
     return []
 
@@ -122,9 +129,12 @@ def matching_docker_for_host():
     """])
 
 def container_id_as_docker_name(container_id):
-    s = container_id
-    r = s if re.match(r"^[a-zA-Z.-]+$", s) else "mesos-" + base64.b16encode(s)
-    return r
+    if re.match(r"^[a-zA-Z0-9.-]+$", container_id):
+        return container_id
+    encoded = "mesos-" + base64.b16encode(container_id)
+    msg = "Creating a safe Docker name for ContainerID %s -> %s"
+    print >>sys.stderr, msg % (container_id, encoded)
+    return encoded
 
 
 def cli(argv=None):
