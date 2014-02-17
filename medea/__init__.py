@@ -40,7 +40,12 @@ def launch(container_id, *args):
             runner_argv = [args[1]] + runner_argv
 
     runner = subprocess.Popen(in_sh(runner_argv))
-    os.close(1)
+    time.sleep(0.25)
+    status = protos.PluggableStatus()
+    status.message = "launch/docker: ok"
+    sys.stdout.write(status.SerializeToString())
+    sys.stdout.flush()
+    os.close(1)            # Must use "low-level" call to force close of stdout
     runner_code = runner.wait()
     return runner_code
 
@@ -53,7 +58,6 @@ def usage(container_id, *args):
 
 def wait(container_id, *args):
     name = container_id_as_docker_name(container_id)
-    time.sleep(1) # Need to wait for container to start :(
     # Container hasn't started yet ... what do?
     # Container started and terminated already ... what do?
     # docker ps --all can help...
