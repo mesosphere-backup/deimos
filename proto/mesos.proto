@@ -476,3 +476,28 @@ message Credential {
   optional bytes secret = 2;
 }
 
+
+/**
+ * Collection of Resource.
+ */
+message ResourceArray {
+  repeated Resource resource = 1;
+}
+
+
+/**
+ * Describes an external containerizer's termination.
+ */
+message PluggableTermination {
+  required uint32 status = 1;
+  required bool killed = 2;
+  required string message = 3;
+}
+
+
+/**
+ * Describes an external containerizer's status.
+ */
+message PluggableStatus {
+  required string message = 1;
+}
