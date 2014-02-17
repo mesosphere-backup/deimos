@@ -41,10 +41,7 @@ def launch(container_id, *args):
 
     runner = subprocess.Popen(in_sh(runner_argv))
     time.sleep(0.25)
-    status = protos.PluggableStatus()
-    status.message = "launch/docker: ok"
-    sys.stdout.write(status.SerializeToString())
-    sys.stdout.flush()
+    proto_out(protos.PluggableStatus, message="launch/docker: ok")
     os.close(1)            # Must use "low-level" call to force close of stdout
     runner_code = runner.wait()
     return runner_code
@@ -68,8 +65,11 @@ def wait(container_id, *args):
         print >>sys.stderr, "!! Bad exit code (%d):" % e.returncode, wait
         return e.returncode
     try:
-        # TODO: Serialize exitcode to protobuf.
         exitcode = int(info)
+        if exitcode != 0:
+            print >>sys.stderr, "!! Container exit code:", exitcode
+        proto_out(protos.PluggableTermination,
+                  status=exitcode, killed=False, message="wait/docker: ok")
         return 0
     except ValueError as e:
         print >>sys.stderr, "Failed to parse container exit %s: %s", info, e
@@ -84,6 +84,7 @@ def destroy(container_id, *args):
         except subprocess.CalledProcessError as e:
             exit = e.returncode
             print >>sys.stderr, "!! Bad exit code (%d):" % exit, argv
+    proto_out(protos.PluggableStatus, message="destroy/docker: ok")
     return exit
 
 
@@ -141,6 +142,13 @@ def container_id_as_docker_name(container_id):
     msg = "Creating a safe Docker name for ContainerID %s -> %s"
     print >>sys.stderr, msg % (container_id, encoded)
     return encoded
+
+def proto_out(cls, **properties):
+    obj = cls()
+    for k, v in properties.iteritems():
+        setattr(obj, k, v)
+    sys.stdout.write(obj.SerializeToString())
+    sys.stdout.flush()
 
 
 def cli(argv=None):
