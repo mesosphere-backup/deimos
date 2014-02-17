@@ -128,7 +128,7 @@ def matching_docker_for_host():
     return subprocess.check_output(["bash", "-c", """
         [[ ! -s /etc/os-release ]] ||
         ( source /etc/os-release && tr A-Z a-z <<<"$ID":"$VERSION_ID" )
-    """])
+    """]).strip()
 
 def container_id_as_docker_name(container_id):
     if re.match(r"^[a-zA-Z0-9.-]+$", container_id):
