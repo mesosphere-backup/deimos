@@ -61,7 +61,7 @@ def wait(container_id, *args):
     try:
         info = subprocess.check_call(in_sh(wait, allstderr=False))
     except subprocess.CalledProcessError as e:
-        print >>sys.stderr, "!! Bad exit code (%d):" % exit, wait
+        print >>sys.stderr, "!! Bad exit code (%d):" % e.returncode, wait
         return e.returncode
     try:
         # TODO: Serialize exitcode to protobuf.
