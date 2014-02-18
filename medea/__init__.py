@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import absolute_import
 import base64
 import inspect
 import os
@@ -7,15 +8,13 @@ import subprocess
 import sys
 import time
 
-try:
-    import mesos_pb2 as protos                     # Prefer system installation
-except:
-    import medea.mesos_pb2 as protos
+try:    import mesos_pb2 as protos                 # Prefer system installation
+except: import medea.mesos_pb2 as protos
+
+import medea.docker
 
 
-MESOS_ESSENTIAL_ENV = [
- "MESOS_SLAVE_ID", "MESOS_FRAMEWORK_ID", "MESOS_EXECUTOR_ID", "MESOS_SLAVE_PID"
-]
+####################################################### Containerizer interface
 
 def launch(container_id, *args):
     mesos_directory()
@@ -28,31 +27,30 @@ def launch(container_id, *args):
     if image == "":
         image = matching_docker_for_host()
     docker_name = container_id_as_docker_name(container_id)
-
     run_options = ["--name", docker_name]
+
+    cpus, mems = None, None
     for r in task.resources:
         if r.name == "cpus":
             run_options += [ "-c", str(int(r.scalar.value * 256)) ]
         if r.name == "mem":
             run_options += [ "-m", str(int(r.scalar.value)) + "m" ]
-        # TODO: Handle ports in here?
 
-    task_env  = [(v.name, v.value) for v in task.command.environment.variables]
-    mesos_env = [(k, os.environ.get(k)) for k in MESOS_ESSENTIAL_ENV]
-    more_env  = [("MESOS_DIRECTORY", "/tmp")]
-    for k, v in task_env + [(k, v) for k, v in mesos_env if v] + more_env:
-        run_options += [ "-e", "%s=%s" % (k, v) ]
+    task_env = [(_.name, _.value) for _ in task.command.environment.variables]
+    env = task_env + mesos_env()
 
-    runner_argv = docker_run(run_options + options, image, argv(task))
+    run_options += options
+    runner_argv = medea.docker.run(run_options, image, argv(task), env=env,
+                                   ports=ports(task), cpus=cpus, mems=mems)
     if needs_executor_wrapper(task):
         if len(args) > 1 and args[0] == "--mesos-executor":
             runner_argv = [args[1]] + runner_argv
 
     with open("stdout", "w") as o:            # This awkward double 'with' is a
         with open("stderr", "w") as e:        # concession to 2.6 compatibility
-            call = in_sh(runner_argv, allstderr=False)
+            call = in_sh(runner_argv, allstderr=False, echo=True)
             runner = subprocess.Popen(call, stdout=o, stderr=e)
-            time.sleep(0.25)
+            time.sleep(0.2) # Every robust, safe program must have one of these
             proto_out(protos.PluggableStatus, message="launch/docker: ok")
             os.close(1)    # Must use "low-level" call to force close of stdout
             runner_code = runner.wait()
@@ -67,7 +65,7 @@ def usage(container_id, *args):
 
 def wait(container_id, *args):
     name = container_id_as_docker_name(container_id)
-    wait = docker(["wait", name])
+    wait = medea.docker.wait(name)
     try:
         # Container hasn't started yet ... what do?
         info = subprocess.check_output(in_sh(wait, allstderr=False))
@@ -89,9 +87,9 @@ def wait(container_id, *args):
 def destroy(container_id, *args):
     exit = 0
     name = container_id_as_docker_name(container_id)
-    for argv in [["stop", "-t=2", name], ["rm", name]]:
+    for argv in [medea.docker.stop(name), medea.docker.rm(name)]:
         try:
-            subprocess.check_call(in_sh(docker(argv)))
+            subprocess.check_call(in_sh(argv))
         except subprocess.CalledProcessError as e:
             exit = e.returncode
             print >>sys.stderr, "!! Bad exit code (%d):" % exit, argv
@@ -99,21 +97,7 @@ def destroy(container_id, *args):
     return exit
 
 
-def docker_run(options, image, command=[]):
-    return docker(["run"] + options + [image] + command)
-
-def docker(argv):
-    return ["docker"] + argv
-
-def in_sh(argv, allstderr=True):
-    """
-    Provides better error messages in case of file not found or permission
-    denied. Note that this has nothing at all to do with shell=True, since
-    quoting prevents the shell from interpreting any arguments.
-    """
-    call = 'exec "$@" 1>&2' if allstderr else 'exec "$@"'
-    return ["/bin/sh", "-c", 'echo ARGV: "$@" >&2 && ' + call, "sh"] + argv
-
+####################################################### Mesos interface helpers
 
 def fetch_command(task):
     if task.HasField("executor"):
@@ -137,9 +121,33 @@ def argv(task):
         return ["sh", "-c", cmd.value]
     return []
 
+def ports(task):
+    resources = [ _.ranges.range for _ in task.resources if _.name == 'ports' ]
+    ranges = [ _ for __ in resources for _ in __ ]
+    # NB: Casting long() to int() so there's no trailing 'L' in later
+    #     stringifications. Ports should only ever be shorts, anyways.
+    ports = [ range(int(_.begin), int(_.end)+1) for _ in ranges ]
+    return [ port for r in ports for port in r ]
+
 def needs_executor_wrapper(task):
     return not task.HasField("executor")
 
+def container_id_as_docker_name(container_id):
+    if re.match(r"^[a-zA-Z0-9.-]+$", container_id):
+        return container_id
+    encoded = "mesos-" + base64.b16encode(container_id)
+    msg = "Creating a safe Docker name for ContainerID %s -> %s"
+    print >>sys.stderr, msg % (container_id, encoded)
+    return encoded
+
+MESOS_ESSENTIAL_ENV = [ "MESOS_SLAVE_ID",     "MESOS_SLAVE_PID",
+                        "MESOS_FRAMEWORK_ID", "MESOS_EXECUTOR_ID" ]
+
+def mesos_env():
+    env = os.environ.get
+    tmp = [ ("MESOS_DIRECTORY", "/tmp") ]
+    return [ (k, env(k)) for k in MESOS_ESSENTIAL_ENV if env(k) ] + tmp
+           
 def mesos_directory():
     if not "MESOS_DIRECTORY" in os.environ:
         return
@@ -150,19 +158,19 @@ def mesos_directory():
         os.chdir(task_dir)
 
 
-def matching_docker_for_host():
-    return subprocess.check_output(["bash", "-c", """
-        [[ ! -s /etc/os-release ]] ||
-        ( source /etc/os-release && tr A-Z a-z <<<"$ID":"$VERSION_ID" )
-    """]).strip()
+####################################################### IO & system interaction
 
-def container_id_as_docker_name(container_id):
-    if re.match(r"^[a-zA-Z0-9.-]+$", container_id):
-        return container_id
-    encoded = "mesos-" + base64.b16encode(container_id)
-    msg = "Creating a safe Docker name for ContainerID %s -> %s"
-    print >>sys.stderr, msg % (container_id, encoded)
-    return encoded
+def in_sh(argv, allstderr=True, echo=False):
+    """
+    Provides better error messages in case of file not found or permission
+    denied. Note that this has nothing at all to do with shell=True, since
+    quoting prevents the shell from interpreting any arguments.
+    """
+    # NB: The use of single and double quotes in construction the call really
+    #     matters.
+    call =  'echo ARGV // "$@" >&2 && ' if echo else ""
+    call += 'exec "$@" 1>&2' if allstderr else 'exec "$@"'
+    return ["/bin/sh", "-c", call, "sh"] + argv
 
 def proto_out(cls, **properties):
     """
@@ -178,6 +186,14 @@ def proto_out(cls, **properties):
     sys.stdout.write(data)
     sys.stdout.flush()
 
+def matching_docker_for_host():
+    return subprocess.check_output(["bash", "-c", """
+        [[ ! -s /etc/os-release ]] ||
+        ( source /etc/os-release && tr A-Z a-z <<<"$ID":"$VERSION_ID" )
+    """]).strip()
+
+
+##################################################### CLI, errors, Python stuff
 
 def cli(argv=None):
     if argv is None: argv = sys.argv
@@ -210,7 +226,6 @@ def cli(argv=None):
                 sys.stdout.write(str(item) + "\n")
     return 0
 
-
 def format_help():
     return """
  USAGE: medea launch  <container-id> (--mesos-executor /a/path)? < taskInfo.pb
@@ -228,10 +243,6 @@ def format_help():
   of data, allowing Mesos to use its default behaviour.
 """.strip("\n")
 
-
-class Err(RuntimeError):
-    pass
-
 # This try block is here to upgrade functionality available the subprocess
 # module for older versions of Python. As last as 2.6, subprocess did not have
 # the check_output function.
@@ -246,6 +257,9 @@ except:
             raise subprocess.CalledProcessError(exitcode, args[0])
         return stdout
     subprocess.check_output = check_output
+
+class Err(RuntimeError):
+    pass
 
 
 if __name__ == "__main__":
