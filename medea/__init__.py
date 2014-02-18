@@ -60,16 +60,17 @@ def wait(container_id, *args):
     # docker ps --all can help...
     wait = docker(["wait", name])
     try:
-        info = subprocess.check_call(in_sh(wait, allstderr=False))
+        info = subprocess.check_output(in_sh(wait, allstderr=False))
     except subprocess.CalledProcessError as e:
         print >>sys.stderr, "!! Bad exit code (%d):" % e.returncode, wait
         return e.returncode
     try:
-        exitcode = int(info)
-        if exitcode != 0:
-            print >>sys.stderr, "!! Container exit code:", exitcode
+        code = int(info)
+        if code != 0:
+            print >>sys.stderr, "!! Container exit code:", code
+        collapsed = code % 256               # Docker can return negative codes
         proto_out(protos.PluggableTermination,
-                  status=exitcode, killed=False, message="wait/docker: ok")
+                  status=collapsed, killed=False, message="wait/docker: ok")
         return 0
     except ValueError as e:
         print >>sys.stderr, "Failed to parse container exit %s: %s", info, e
@@ -80,7 +81,8 @@ def destroy(container_id, *args):
     exit = 0
     name = container_id_as_docker_name(container_id)
     for argv in [["stop", "-t=2", name], ["rm", name]]:
-        try: subprocess.check_call(in_sh(docker(argv)))
+        try:
+            subprocess.check_call(in_sh(docker(argv)))
         except subprocess.CalledProcessError as e:
             exit = e.returncode
             print >>sys.stderr, "!! Bad exit code (%d):" % exit, argv
@@ -144,10 +146,17 @@ def container_id_as_docker_name(container_id):
     return encoded
 
 def proto_out(cls, **properties):
+    """
+    With a Protobuf class and properies as keyword arguments, sets all the
+    properties on a new instance of the class and serializes the resulting
+    value to stdout.
+    """
     obj = cls()
     for k, v in properties.iteritems():
         setattr(obj, k, v)
-    sys.stdout.write(obj.SerializeToString())
+    data = obj.SerializeToString()
+    # print >>sys.stderr, "medea/proto:", base64.b16encode(data).lower()
+    sys.stdout.write(data)
     sys.stdout.flush()
 
 
