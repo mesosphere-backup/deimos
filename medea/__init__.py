@@ -67,11 +67,9 @@ def usage(container_id, *args):
 
 def wait(container_id, *args):
     name = container_id_as_docker_name(container_id)
-    # Container hasn't started yet ... what do?
-    # Container started and terminated already ... what do?
-    # docker ps --all can help...
     wait = docker(["wait", name])
     try:
+        # Container hasn't started yet ... what do?
         info = subprocess.check_output(in_sh(wait, allstderr=False))
     except subprocess.CalledProcessError as e:
         print >>sys.stderr, "!! Bad exit code (%d):" % e.returncode, wait
@@ -87,7 +85,6 @@ def wait(container_id, *args):
     except ValueError as e:
         print >>sys.stderr, "Failed to parse container exit %s: %s", info, e
     return 1
-
 
 def destroy(container_id, *args):
     exit = 0
