@@ -13,7 +13,12 @@ except:
     import medea.mesos_pb2 as protos
 
 
+MESOS_ESSENTIAL_ENV = [
+ "MESOS_SLAVE_ID", "MESOS_FRAMEWORK_ID", "MESOS_EXECUTOR_ID", "MESOS_SLAVE_PID"
+]
+
 def launch(container_id, *args):
+    mesos_directory()
     task = protos.TaskInfo()
     task.ParseFromString(sys.stdin.read())
     (url, options) = container(task)
@@ -31,19 +36,26 @@ def launch(container_id, *args):
         if r.name == "mem":
             run_options += [ "-m", str(int(r.scalar.value)) + "m" ]
         # TODO: Handle ports in here?
-    for k, v in os.environ.items():
-        run_options += [ "-e", "%s=%s" % (k,v) ]
+
+    task_env  = [(v.name, v.value) for v in task.command.environment.variables]
+    mesos_env = [(k, os.environ.get(k)) for k in MESOS_ESSENTIAL_ENV]
+    more_env  = [("MESOS_DIRECTORY", "/tmp")]
+    for k, v in task_env + [(k, v) for k, v in mesos_env if v] + more_env:
+        run_options += [ "-e", "%s=%s" % (k, v) ]
 
     runner_argv = docker_run(run_options + options, image, argv(task))
     if needs_executor_wrapper(task):
         if len(args) > 1 and args[0] == "--mesos-executor":
             runner_argv = [args[1]] + runner_argv
 
-    runner = subprocess.Popen(in_sh(runner_argv))
-    time.sleep(0.25)
-    proto_out(protos.PluggableStatus, message="launch/docker: ok")
-    os.close(1)            # Must use "low-level" call to force close of stdout
-    runner_code = runner.wait()
+    with open("stdout", "w") as o:            # This awkward double 'with' is a
+        with open("stderr", "w") as e:        # concession to 2.6 compatibility
+            call = in_sh(runner_argv, allstderr=False)
+            runner = subprocess.Popen(call, stdout=o, stderr=e)
+            time.sleep(0.25)
+            proto_out(protos.PluggableStatus, message="launch/docker: ok")
+            os.close(1)    # Must use "low-level" call to force close of stdout
+            runner_code = runner.wait()
     return runner_code
 
 def update(container_id, *args):
@@ -130,6 +142,16 @@ def argv(task):
 
 def needs_executor_wrapper(task):
     return not task.HasField("executor")
+
+def mesos_directory():
+    if not "MESOS_DIRECTORY" in os.environ:
+        return
+    work_dir = os.path.abspath(os.getcwd())
+    task_dir = os.path.abspath(os.environ["MESOS_DIRECTORY"])
+    if task_dir != work_dir:
+        print >>sys.stderr, "Changing directory to MESOS_DIRECTORY"
+        os.chdir(task_dir)
+
 
 def matching_docker_for_host():
     return subprocess.check_output(["bash", "-c", """
