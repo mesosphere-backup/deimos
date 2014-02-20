@@ -12,6 +12,7 @@ try:    import mesos_pb2 as protos                 # Prefer system installation
 except: import medea.mesos_pb2 as protos
 
 import medea.docker
+import medea.cgroups
 
 
 ####################################################### Containerizer interface
@@ -32,7 +33,7 @@ def launch(container_id, *args):
     cpus, mems = None, None
     for r in task.resources:
         if r.name == "cpus":
-            run_options += [ "-c", str(int(r.scalar.value * 256)) ]
+            run_options += [ "-c", str(int(r.scalar.value * 1024)) ]
         if r.name == "mem":
             run_options += [ "-m", str(int(r.scalar.value)) + "m" ]
 
@@ -60,8 +61,16 @@ def update(container_id, *args):
     pass
 
 def usage(container_id, *args):
-    # TODO: Use HTTP API to grab resources
-    pass
+    name = container_id_as_docker_name(container_id)
+    cg   = medea.cgroups.CGroups(**medea.docker.cgroups(name))
+    proto_out(protos.ResourceStatistics,
+              timestamp             = time.time(),
+              mem_limit_bytes       = cg.memory.limit(),
+              cpus_limit            = cg.cpu.limit(),
+              cpus_user_time_secs   = cg.cpuacct.user_time(),
+              cpus_system_time_secs = cg.cpuacct.system_time(),
+              mem_rss_bytes         = cg.memory.rss())
+    return 0
 
 def wait(container_id, *args):
     name = container_id_as_docker_name(container_id)
@@ -180,9 +189,9 @@ def proto_out(cls, **properties):
     """
     obj = cls()
     for k, v in properties.iteritems():
+        # print >>sys.stderr, "%s.%s" % (cls.__name__, k), "=", v
         setattr(obj, k, v)
     data = obj.SerializeToString()
-    # print >>sys.stderr, "medea/proto:", base64.b16encode(data).lower()
     sys.stdout.write(data)
     sys.stdout.flush()
 

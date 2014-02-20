@@ -1,3 +1,4 @@
+import glob
 import itertools
 import json
 import re
@@ -76,4 +77,27 @@ def inner_ports(image):
         if specs and isinstance(specs, list):
             return [ int(v.split(":")[-1]) for v in specs ]
     return [] # If all else fails...
+
+
+################################################# System and process interfaces
+
+def root_pid(ident):
+    """Lookup the root PID for the given container.
+    This is the PID that corresponds the `lxc-start` command at the root of
+    the container's process tree.
+    """
+    fetch_lxc_pid = """ ps -C lxc-start -o pid= -o args= | # Look for lxc-start
+                        fgrep -- " -n $1" |           # Just for this container
+                        cut -d" " -f1                       # Keep only the PID
+                    """
+    argv = ["sh", "-c", fetch_lxc_pid.strip(), "sh", canonical_id(ident)]
+    return subprocess.check_output(argv).strip()
+
+def cgroups(ident):
+    paths = glob.glob("/sys/fs/cgroup/*/" + canonical_id(ident))
+    return dict( (s.split("/")[-2], s) for s in paths )
+
+def canonical_id(ident):
+    argv = ["docker", "inspect", "--format={{.ID}}", ident]
+    return subprocess.check_output(argv).strip()
 
