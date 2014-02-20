@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import base64
 import inspect
 import os
+import random
 import re
 import subprocess
 import sys
@@ -30,16 +31,21 @@ def launch(container_id, *args):
     docker_name = container_id_as_docker_name(container_id)
     run_options = ["--name", docker_name]
 
-    cpus, mems = None, None
-    for r in task.resources:
-        if r.name == "cpus":
-            run_options += [ "-c", str(int(r.scalar.value * 1024)) ]
-        if r.name == "mem":
-            run_options += [ "-m", str(int(r.scalar.value)) + "m" ]
+    place_uris(task, "fs")
+    sandbox_mountpoint = "/tmp/mesos-sandbox/"
+    run_options += [ "-w", sandbox_mountpoint ]
 
+    # Docker requires an absolute path to a source filesystem, separated from
+    # the bind path in the container with a colon, but the absolute path to
+    # the Mesos sandbox might have colons in it (TaskIDs with timestamps can
+    # cause this situation). So we create a soft link to it and mount that.
+    sandbox_softlink = "/tmp/medea-fs-sandbox.%016x" % random.getrandbits(64)
+    subprocess.check_call(["ln", "-s", os.path.abspath("fs"), sandbox_softlink])
+    run_options += [ "-v", "%s:%s" % (sandbox_softlink, sandbox_mountpoint) ]
+
+    cpus, mems = cpu_and_mem(task)
     task_env = [(_.name, _.value) for _ in task.command.environment.variables]
-    env = task_env + mesos_env()
-
+    env = task_env + mesos_env() + [ ("MESOS_DIRECTORY", sandbox_mountpoint) ]
     run_options += options
     runner_argv = medea.docker.run(run_options, image, argv(task), env=env,
                                    ports=ports(task), cpus=cpus, mems=mems)
@@ -50,8 +56,11 @@ def launch(container_id, *args):
     with open("stdout", "w") as o:            # This awkward double 'with' is a
         with open("stderr", "w") as e:        # concession to 2.6 compatibility
             call = in_sh(runner_argv, allstderr=False, echo=True)
-            runner = subprocess.Popen(call, stdout=o, stderr=e)
-            time.sleep(0.2) # Every robust, safe program must have one of these
+            try:
+                runner = subprocess.Popen(call, stdout=o, stderr=e)
+                time.sleep(0.1)
+            finally:
+                subprocess.check_call(["rm", "-f", sandbox_softlink])
             proto_out(protos.PluggableStatus, message="launch/docker: ok")
             os.close(1)    # Must use "low-level" call to force close of stdout
             runner_code = runner.wait()
@@ -130,6 +139,9 @@ def argv(task):
         return ["sh", "-c", cmd.value]
     return []
 
+def uris(task):
+    return fetch_command(task).uris
+
 def ports(task):
     resources = [ _.ranges.range for _ in task.resources if _.name == 'ports' ]
     ranges = [ _ for __ in resources for _ in __ ]
@@ -137,6 +149,15 @@ def ports(task):
     #     stringifications. Ports should only ever be shorts, anyways.
     ports = [ range(int(_.begin), int(_.end)+1) for _ in ranges ]
     return [ port for r in ports for port in r ]
+
+def cpu_and_mem(task):
+    cpu, mem = None, None
+    for r in task.resources:
+        if r.name == "cpus":
+            cpu = str(int(r.scalar.value * 1024))
+        if r.name == "mem":
+            mem = str(int(r.scalar.value)) + "m"
+    return (cpu, mem)
 
 def needs_executor_wrapper(task):
     return not task.HasField("executor")
@@ -156,7 +177,7 @@ def mesos_env():
     env = os.environ.get
     tmp = [ ("MESOS_DIRECTORY", "/tmp") ]
     return [ (k, env(k)) for k in MESOS_ESSENTIAL_ENV if env(k) ] + tmp
-           
+
 def mesos_directory():
     if not "MESOS_DIRECTORY" in os.environ:
         return
@@ -165,6 +186,30 @@ def mesos_directory():
     if task_dir != work_dir:
         print >>sys.stderr, "Changing directory to MESOS_DIRECTORY"
         os.chdir(task_dir)
+
+def place_uris(task, directory):
+    tmp = "tmp.scratch"
+    subprocess.check_call(["mkdir", "-p", directory])
+    for uri in uris(task):
+        try:
+            print >>sys.stderr, "Retrieving URI:", uri
+            cmds = [in_sh(["curl", "-sSfL", uri, "--output", tmp], echo=True),
+                    in_sh(classical_mesos_interpretation(uri, tmp, directory))]
+            for cmd in cmds:
+                try:
+                    subprocess.check_call(cmd)
+                except subprocess.CalledProcessError as e:
+                    msg = "!! While processing URI (%s), bad exit code (%d):"
+                    print >>sys.stderr, msg % (e.returncode, uri), argv
+        finally:
+            subprocess.check_call(["rm", "-f", tmp])
+
+def classical_mesos_interpretation(uri, path, directory):
+    if re.match(r"[.](t|tar[.])(gz|xz|bz2)$", path):
+        return ["tar", "-C", directory, "-xf", path]
+    if path.split(".")[-1] == [".zip"]:
+        return ["unzip", "-d", directory, path]
+    return ["mv", path, directory]
 
 
 ####################################################### IO & system interaction
