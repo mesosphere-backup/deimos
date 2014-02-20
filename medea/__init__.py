@@ -175,7 +175,7 @@ def in_sh(argv, allstderr=True, echo=False):
     denied. Note that this has nothing at all to do with shell=True, since
     quoting prevents the shell from interpreting any arguments.
     """
-    # NB: The use of single and double quotes in construction the call really
+    # NB: The use of single and double quotes in constructing the call really
     #     matters.
     call =  'echo ARGV // "$@" >&2 && ' if echo else ""
     call += 'exec "$@" 1>&2' if allstderr else 'exec "$@"'
