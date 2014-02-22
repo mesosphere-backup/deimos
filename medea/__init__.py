@@ -44,19 +44,29 @@ def launch(container_id, *args):
     run_options += [ "-v", "%s:%s" % (sandbox_softlink, sandbox_mountpoint) ]
 
     cpus, mems = cpu_and_mem(task)
-    task_env = [(_.name, _.value) for _ in task.command.environment.variables]
-    env = task_env + mesos_env() + [ ("MESOS_DIRECTORY", sandbox_mountpoint) ]
+    env = [(_.name, _.value) for _ in task.command.environment.variables]
     run_options += options
-    runner_argv = medea.docker.run(run_options, image, argv(task), env=env,
-                                   ports=ports(task), cpus=cpus, mems=mems)
+
+    # We need to wrap the call to Docker in a call to the Mesos executor if no
+    # executor is passed as part of the task. We need to pass the MESOS_*
+    # environment variables in to the container if we're going to start an
+    # executor.
     if needs_executor_wrapper(task):
-        if len(args) > 1 and args[0] == "--mesos-executor":
-            runner_argv = [args[1]] + runner_argv
+        if not(len(args) > 1 and args[0] == "--mesos-executor"):
+            raise RuntimeError("This task needs --mesos-executor to be set!")
+        runner_argv = [args[1]]
+    else:
+        env += mesos_env() + [("MESOS_DIRECTORY", sandbox_mountpoint)]
+        runner_argv = []
+
+    runner_argv += medea.docker.run(run_options, image, argv(task), env=env,
+                                    ports=ports(task), cpus=cpus, mems=mems)
 
     with open("stdout", "w") as o:            # This awkward double 'with' is a
         with open("stderr", "w") as e:        # concession to 2.6 compatibility
-            call = in_sh(runner_argv, allstderr=False, echo=True)
+            call = in_sh(runner_argv, allstderr=False)
             try:
+                print >>sys.stderr, "ARGV // " + " ".join(runner_argv)
                 runner = subprocess.Popen(call, stdout=o, stderr=e)
                 time.sleep(0.1)
             finally:
@@ -105,7 +115,7 @@ def wait(container_id, *args):
 def destroy(container_id, *args):
     exit = 0
     name = container_id_as_docker_name(container_id)
-    for argv in [medea.docker.stop(name), medea.docker.rm(name)]:
+    for argv in [medea.docker.stop(name)]: #, medea.docker.rm(name)]:
         try:
             subprocess.check_call(in_sh(argv))
         except subprocess.CalledProcessError as e:
@@ -188,28 +198,28 @@ def mesos_directory():
         os.chdir(task_dir)
 
 def place_uris(task, directory):
-    tmp = "tmp.scratch"
     subprocess.check_call(["mkdir", "-p", directory])
-    for uri in uris(task):
+    for item in uris(task):
+        uri = item.value
+        print >>sys.stderr, "Retrieving URI: %r" % uri
         try:
-            print >>sys.stderr, "Retrieving URI:", uri
-            cmds = [in_sh(["curl", "-sSfL", uri, "--output", tmp], echo=True),
-                    in_sh(classical_mesos_interpretation(uri, tmp, directory))]
-            for cmd in cmds:
-                try:
-                    subprocess.check_call(cmd)
-                except subprocess.CalledProcessError as e:
-                    msg = "!! While processing URI (%s), bad exit code (%d):"
-                    print >>sys.stderr, msg % (e.returncode, uri), argv
-        finally:
-            subprocess.check_call(["rm", "-f", tmp])
-
-def classical_mesos_interpretation(uri, path, directory):
-    if re.match(r"[.](t|tar[.])(gz|xz|bz2)$", path):
-        return ["tar", "-C", directory, "-xf", path]
-    if path.split(".")[-1] == [".zip"]:
-        return ["unzip", "-d", directory, path]
-    return ["mv", path, directory]
+            basename = uri.split("/")[-1]
+            f = os.path.join(directory, basename)
+            if basename == "":
+                raise IndexError
+        except IndexError:
+            print >>sys.stderr, "Not able to determine basename: %r" % uri
+            continue
+        cmd = in_sh(["curl", "-sSfL", uri, "--output", f], echo=True)
+        try:
+            subprocess.check_call(cmd)
+        except subprocess.CalledProcessError as e:
+            msg = "!! While processing URI (%r), bad exit code (%d):"
+            print >>sys.stderr, msg % (e.returncode, uri)
+            print >>sys.stderr, argv
+            continue
+        if item.executable:
+            os.chmod(f, 0755)
 
 
 ####################################################### IO & system interaction
@@ -218,12 +228,14 @@ def in_sh(argv, allstderr=True, echo=False):
     """
     Provides better error messages in case of file not found or permission
     denied. Note that this has nothing at all to do with shell=True, since
-    quoting prevents the shell from interpreting any arguments.
+    quoting prevents the shell from interpreting any arguments -- they are
+    passed straight on to shell exec.
     """
     # NB: The use of single and double quotes in constructing the call really
     #     matters.
     call =  'echo ARGV // "$@" >&2 && ' if echo else ""
-    call += 'exec "$@" 1>&2' if allstderr else 'exec "$@"'
+    call += 'exec "$@"'
+    call += " >&2" if allstderr else ""
     return ["/bin/sh", "-c", call, "sh"] + argv
 
 def proto_out(cls, **properties):

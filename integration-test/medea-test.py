@@ -5,6 +5,8 @@ import random
 import sys
 import time
 
+import google.protobuf as pb
+
 import mesos
 import mesos_pb2
 
@@ -13,6 +15,7 @@ import mesos_pb2
 
 class Scheduler(mesos.Scheduler):
     def __init__(self):
+        self.token    = "%016x" % random.getrandbits(64)
         self.task_max = 10
         self.tasks    = []
         self.statuses = {}
@@ -25,10 +28,12 @@ class Scheduler(mesos.Scheduler):
         task, code = update.task_id.value, update.state
         self.statuses[task] = code
         name = mesos_pb2.TaskState.Name(code)
-        print >>sys.stderr, "Task %s is in state %s" % (task, name)
+        info = "%s: %s" % (task, name)
+        if update.HasField("message"):
+            info += "\n  " + update.message
+        print >>sys.stderr, info
     def next_task_id(self):
-        fmt = "medea-test-task%02d-framework-%s"
-        return fmt % (len(self.tasks), self.framework_id.value)
+        return "medea-test-%s-task%02d" % (self.token, len(self.tasks))
     terminal = set([ mesos_pb2.TASK_FINISHED,
                      mesos_pb2.TASK_FAILED,
                      mesos_pb2.TASK_KILLED,
@@ -37,7 +42,7 @@ class Scheduler(mesos.Scheduler):
                      mesos_pb2.TASK_KILLED,
                      mesos_pb2.TASK_LOST ])
 
-class ExecutorScheduler(Scheduler):
+class ExecutorScheduler(Scheduler):                # TODO: Make this class work
     def __init__(self, command, uris=[], container=None):
         Scheduler.__init__(self)
         self.command   = command
@@ -45,11 +50,11 @@ class ExecutorScheduler(Scheduler):
         self.container = container
         self.messages  = []
     def statusUpdate(self, driver, update):
-        super(Scheduler, self).statusUpdate(driver, update)
+        super(ExecutorScheduler, self).statusUpdate(driver, update)
         if update.state == mesos_pb2.TASK_RUNNING:
             pass                  # TODO: Send a message if we get TASK_RUNNING
         task_terminated = update.state in Scheduler.terminal
-        enough_tasks    = len(self.tasks) >= self.tasks_max
+        enough_tasks    = len(self.tasks) >= self.task_max
         if task_terminated and enough_tasks:
             driver.stop()
     def frameworkMessage(self, driver, executor_id, slave_id, msg):
@@ -57,7 +62,7 @@ class ExecutorScheduler(Scheduler):
         driver.killTask(update.task_id)
     def resourceOffers(self, driver, offers):
         for offer in offers:
-            if len(self.tasks) >= self.tasks_max: break
+            if len(self.tasks) >= self.task_max: break
             tid  = self.next_task_id()
             sid  = offer.slave_id
             task = task_with_executor(tid, sid)
@@ -71,21 +76,30 @@ class SleepScheduler(Scheduler):
         self.uris      = uris
         self.container = container
     def statusUpdate(self, driver, update):
-        super(Scheduler, self).statusUpdate(driver, update)
+        super(SleepScheduler, self).statusUpdate(driver, update)
         task_terminated = update.state in Scheduler.terminal
-        enough_tasks    = len(self.tasks) >= self.tasks_max
+        enough_tasks    = len(self.tasks) >= self.task_max
         if task_terminated and enough_tasks:
+            print >>sys.stderr, "Tried enough times"
+            err = None
+            for task in self.tasks:
+                try:
+                    driver.killTask(task.task_id)
+                except Exception as e:
+                    err = e
             driver.stop()
+            if err: raise err
     def resourceOffers(self, driver, offers):
-        delay = int(float(self.sleep) / self.tasks_max)
+        delay = int(float(self.sleep) / self.task_max)
         for offer in offers:
-            if len(self.tasks) >= self.tasks_max: break
-            time.sleep(delay)             # Space out the requests a little bit
+            if len(self.tasks) >= self.task_max: break
+            time.sleep(delay)                    # Space out the requests a bit
             tid  = self.next_task_id()
             sid  = offer.slave_id
-            cmd  = "sleep %d" % self.sleep
+            cmd  = "date -u +%T ; sleep " + str(self.sleep) + " ; date -u +%T"
             task = task_with_command(tid, sid, cmd, self.uris, self.container)
             self.tasks += [task]
+            print >>sys.stderr, present_task(task)
             driver.launchTasks(offer.id, [task])
 
 class PGScheduler(Scheduler):
@@ -93,22 +107,23 @@ class PGScheduler(Scheduler):
         Scheduler.__init__(self)
         self.container = container
     def statusUpdate(self, driver, update):
-        super(Scheduler, self).statusUpdate(driver, update)
+        super(PGScheduler, self).statusUpdate(driver, update)
         if update.state == mesos_pb2.TASK_RUNNING:
             time.sleep(2)
             driver.killTask(update.task_id)       # Shutdown Postgres container
         task_terminated = update.state in Scheduler.terminal
-        enough_tasks    = len(self.tasks) >= self.tasks_max
+        enough_tasks    = len(self.tasks) >= self.task_max
         if task_terminated and enough_tasks:
             driver.stop()
     def resourceOffers(self, driver, offers):
         for offer in offers:
-            if len(self.tasks) >= self.tasks_max: break
+            if len(self.tasks) >= self.task_max: break
             time.sleep(2)
             tid  = self.next_task_id()
             sid  = offer.slave_id
             task = task_with_daemon(tid, sid, self.container)
             self.tasks += [task]
+            print >>sys.stderr, present_task(task)
             driver.launchTasks(offer.id, [task])
 
 
@@ -135,11 +150,10 @@ def task_with_daemon(tid, sid, image):
     return task
 
 def task_base(tid, sid, cpu=0.5, ram=256):
-    task_id = "medea-test-%05d" % tid
     task = mesos_pb2.TaskInfo()
-    task.task_id.value = task_id
+    task.task_id.value = tid
     task.slave_id.value = sid.value
-    task.name = task_id
+    task.name = tid
     cpus = task.resources.add()
     cpus.name = "cpus"
     cpus.type = mesos_pb2.Value.SCALAR
@@ -159,13 +173,21 @@ def command(shell="", uris=[], image=None):
         command.container.MergeFrom(container)
     return command
 
+def present_task(task):
+    label = task.task_id.value
+    if task.HasField("executor"):
+        token, body = "executor", task.executor
+    else:
+        token, body = "command", task.command
+    lines = pb.text_format.MessageToString(body).strip().split("\n")
+    return "task_id: %s\n%s {\n  %s\n}" % (label, token, "\n  ".join(lines))
+
 
 ########################################################################## Main
 
 def cli():
-    schedulers = { "sleep"    : SleepScheduler,
-                   "pg"       : PGScheduler,
-                   "executor" : ExecutorScheduler }
+    schedulers = { "sleep" : SleepScheduler,
+                   "pg"    : PGScheduler }
     p = argparse.ArgumentParser(prog="medea-test.py")
     p.add_argument("--master", default="localhost:5050",
                    help="Mesos master URL")
@@ -190,7 +212,10 @@ def cli():
     framework.name = "medea-test"
     framework.user = ""
     driver = mesos.MesosSchedulerDriver(scheduler, framework, parsed.master)
-    os._exit(0 if driver.run() == mesos_pb2.DRIVER_STOPPED else 1)
+    code = driver.run()
+    print >>sys.stderr, mesos_pb2.Status.Name(code)
+    driver.stop()
+    os._exit(0 if code == mesos_pb2.DRIVER_STOPPED else 1)
 
 if __name__ == "__main__": cli()
 
