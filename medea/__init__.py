@@ -82,13 +82,17 @@ def update(container_id, *args):
 def usage(container_id, *args):
     name = container_id_as_docker_name(container_id)
     cg   = medea.cgroups.CGroups(**medea.docker.cgroups(name))
-    proto_out(protos.ResourceStatistics,
-              timestamp             = time.time(),
-              mem_limit_bytes       = cg.memory.limit(),
-              cpus_limit            = cg.cpu.limit(),
-              cpus_user_time_secs   = cg.cpuacct.user_time(),
-              cpus_system_time_secs = cg.cpuacct.system_time(),
-              mem_rss_bytes         = cg.memory.rss())
+    try:
+        proto_out(protos.ResourceStatistics,
+                  timestamp             = time.time(),
+                  mem_limit_bytes       = cg.memory.limit(),
+                  cpus_limit            = cg.cpu.limit(),
+                  cpus_user_time_secs   = cg.cpuacct.user_time(),
+                  cpus_system_time_secs = cg.cpuacct.system_time(),
+                  mem_rss_bytes         = cg.memory.rss())
+    except AttributeError as e:
+        print >>sys.stderr, "In usage():", e
+        return 1
     return 0
 
 def wait(container_id, *args):
