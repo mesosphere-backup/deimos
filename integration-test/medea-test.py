@@ -14,9 +14,9 @@ import mesos_pb2
 #################################### Schedulers implement the integration tests
 
 class Scheduler(mesos.Scheduler):
-    def __init__(self):
+    def __init__(self, trials=10):
         self.token    = "%016x" % random.getrandbits(64)
-        self.task_max = 10
+        self.trials   = trials
         self.tasks    = []
         self.statuses = {}
     def __repr__(self):
@@ -43,8 +43,8 @@ class Scheduler(mesos.Scheduler):
                      mesos_pb2.TASK_LOST ])
 
 class ExecutorScheduler(Scheduler):                # TODO: Make this class work
-    def __init__(self, command, uris=[], container=None):
-        Scheduler.__init__(self)
+    def __init__(self, command, uris=[], container=None, trials=10):
+        Scheduler.__init__(self, trials)
         self.command   = command
         self.uris      = uris
         self.container = container
@@ -54,7 +54,7 @@ class ExecutorScheduler(Scheduler):                # TODO: Make this class work
         if update.state == mesos_pb2.TASK_RUNNING:
             pass                  # TODO: Send a message if we get TASK_RUNNING
         task_terminated = update.state in Scheduler.terminal
-        enough_tasks    = len(self.tasks) >= self.task_max
+        enough_tasks    = len(self.tasks) >= self.trials
         if task_terminated and enough_tasks:
             driver.stop()
     def frameworkMessage(self, driver, executor_id, slave_id, msg):
@@ -62,7 +62,7 @@ class ExecutorScheduler(Scheduler):                # TODO: Make this class work
         driver.killTask(update.task_id)
     def resourceOffers(self, driver, offers):
         for offer in offers:
-            if len(self.tasks) >= self.task_max: break
+            if len(self.tasks) >= self.trials: break
             tid  = self.next_task_id()
             sid  = offer.slave_id
             task = task_with_executor(tid, sid)
@@ -70,15 +70,15 @@ class ExecutorScheduler(Scheduler):                # TODO: Make this class work
             driver.launchTasks(offer.id, [task])
 
 class SleepScheduler(Scheduler):
-    def __init__(self, sleep=20, uris=[], container=None):
-        Scheduler.__init__(self)
+    def __init__(self, sleep=20, uris=[], container=None, trials=10):
+        Scheduler.__init__(self, trials)
         self.sleep     = sleep
         self.uris      = uris
         self.container = container
     def statusUpdate(self, driver, update):
         super(SleepScheduler, self).statusUpdate(driver, update)
         task_terminated = update.state in Scheduler.terminal
-        enough_tasks    = len(self.tasks) >= self.task_max
+        enough_tasks    = len(self.tasks) >= self.trials
         if task_terminated and enough_tasks:
             print >>sys.stderr, "Tried enough times"
             err = None
@@ -90,9 +90,10 @@ class SleepScheduler(Scheduler):
             driver.stop()
             if err: raise err
     def resourceOffers(self, driver, offers):
-        delay = int(float(self.sleep) / self.task_max)
+        delay = int(float(self.sleep) / self.trials)
         for offer in offers:
-            if len(self.tasks) >= self.task_max: break
+            if len(self.tasks) >= self.trials: break
+          # time.sleep(self.sleep + 0.5)
             time.sleep(delay)                    # Space out the requests a bit
             tid  = self.next_task_id()
             sid  = offer.slave_id
@@ -103,8 +104,8 @@ class SleepScheduler(Scheduler):
             driver.launchTasks(offer.id, [task])
 
 class PGScheduler(Scheduler):
-    def __init__(self, container="docker:///zaiste/postgresql"):
-        Scheduler.__init__(self)
+    def __init__(self, container="docker:///zaiste/postgresql", trials=10):
+        Scheduler.__init__(self, trials)
         self.container = container
     def statusUpdate(self, driver, update):
         super(PGScheduler, self).statusUpdate(driver, update)
@@ -112,12 +113,12 @@ class PGScheduler(Scheduler):
             time.sleep(2)
             driver.killTask(update.task_id)       # Shutdown Postgres container
         task_terminated = update.state in Scheduler.terminal
-        enough_tasks    = len(self.tasks) >= self.task_max
+        enough_tasks    = len(self.tasks) >= self.trials
         if task_terminated and enough_tasks:
             driver.stop()
     def resourceOffers(self, driver, offers):
         for offer in offers:
-            if len(self.tasks) >= self.task_max: break
+            if len(self.tasks) >= self.trials: break
             time.sleep(2)
             tid  = self.next_task_id()
             sid  = offer.slave_id
@@ -194,11 +195,15 @@ def cli():
     p.add_argument("--test", choices=schedulers.keys(), default="sleep",
                    help="Test suite to use")
     p.add_argument("--test.container",
-                   help="Image URL to use for test.")
+                   help="Image URL to use (for any test)")
     p.add_argument("--test.sleep", type=int,
                    help="Seconds to sleep (for sleep test)")
+    p.add_argument("--test.trials", type=int,
+                   help="Number of tasks to run (for any test)")
     p.add_argument("--test.command",
                    help="Command to use (for executor test)")
+    p.add_argument("--test.uris", nargs="*", default=[],
+                   help="Pass any number of times to pass URIs (for any test)")
     parsed = p.parse_args()
 
     pairs = [ (k.split("test.")[1:], v) for k, v in vars(parsed).items() ]
