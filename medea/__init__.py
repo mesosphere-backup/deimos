@@ -82,6 +82,7 @@ def update(container_id, *args):
 def usage(container_id, *args):
     name = container_id_as_docker_name(container_id)
     cg   = medea.cgroups.CGroups(**medea.docker.cgroups(name))
+    print >>sys.stderr, "Found CGroups:", " ".join(cg.keys())
     try:
         proto_out(protos.ResourceStatistics,
                   timestamp             = time.time(),
@@ -117,7 +118,6 @@ def wait(container_id, *args):
     return 1
 
 def destroy(container_id, *args):
-    exit = 0
     name = container_id_as_docker_name(container_id)
     for argv in [medea.docker.stop(name)]: #, medea.docker.rm(name)]:
         try:
@@ -125,8 +125,9 @@ def destroy(container_id, *args):
         except subprocess.CalledProcessError as e:
             exit = e.returncode
             print >>sys.stderr, "!! Bad exit code (%d):" % exit, argv
+            return exit
     proto_out(protos.PluggableStatus, message="destroy/docker: ok")
-    return exit
+    return 0
 
 
 ####################################################### Mesos interface helpers
