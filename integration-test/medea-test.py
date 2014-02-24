@@ -167,8 +167,10 @@ def task_base(tid, sid, cpu=0.5, ram=256):
 
 def command(shell="", uris=[], image=None):
     command = mesos_pb2.CommandInfo()
-    command.value = shell                                          # TODO: URIs
-    if image:                                       # Rely on the default image
+    command.value = shell
+    for uri in uris:
+        command.uris.add().value = uri
+    if image:                      # Rely on the default image when none is set
         container = mesos_pb2.CommandInfo.ContainerInfo()
         container.image = image
         command.container.MergeFrom(container)
