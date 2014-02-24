@@ -49,13 +49,15 @@ class ExecutorScheduler(Scheduler):                # TODO: Make this class work
         self.uris      = uris
         self.container = container
         self.messages  = []
+        self.done      = []
     def statusUpdate(self, driver, update):
         super(ExecutorScheduler, self).statusUpdate(driver, update)
         if update.state == mesos_pb2.TASK_RUNNING:
             pass                  # TODO: Send a message if we get TASK_RUNNING
-        task_terminated = update.state in Scheduler.terminal
-        enough_tasks    = len(self.tasks) >= self.trials
-        if task_terminated and enough_tasks:
+        if update.state in Scheduler.terminal:
+            self.done += [update.task_id]
+        if len(self.done) >= self.trials:
+            print >>sys.stderr, "Tried enough times"
             driver.stop()
     def frameworkMessage(self, driver, executor_id, slave_id, msg):
         self.messages += [msg]
@@ -70,25 +72,20 @@ class ExecutorScheduler(Scheduler):                # TODO: Make this class work
             driver.launchTasks(offer.id, [task])
 
 class SleepScheduler(Scheduler):
-    def __init__(self, sleep=20, uris=[], container=None, trials=10):
+    wiki = "https://en.wikipedia.org/wiki/Main_Page"
+    def __init__(self, sleep=10, uris=[wiki], container=None, trials=5):
         Scheduler.__init__(self, trials)
         self.sleep     = sleep
         self.uris      = uris
         self.container = container
+        self.done      = []
     def statusUpdate(self, driver, update):
         super(SleepScheduler, self).statusUpdate(driver, update)
-        task_terminated = update.state in Scheduler.terminal
-        enough_tasks    = len(self.tasks) >= self.trials
-        if task_terminated and enough_tasks:
+        if update.state in Scheduler.terminal:
+            self.done += [update.task_id]
+        if len(self.done) >= self.trials:
             print >>sys.stderr, "Tried enough times"
-            err = None
-            for task in self.tasks:
-                try:
-                    driver.killTask(task.task_id)
-                except Exception as e:
-                    err = e
             driver.stop()
-            if err: raise err
     def resourceOffers(self, driver, offers):
         delay = int(float(self.sleep) / self.trials)
         for offer in offers:
@@ -204,8 +201,8 @@ def cli():
                    help="Number of tasks to run (for any test)")
     p.add_argument("--test.command",
                    help="Command to use (for executor test)")
-    p.add_argument("--test.uris", nargs="*", default=[],
-                   help="Pass any number of times to pass URIs (for any test)")
+    p.add_argument("--test.uris", action="append",
+                   help="Pass any number of times to add URIs (for any test)")
     parsed = p.parse_args()
 
     pairs = [ (k.split("test.")[1:], v) for k, v in vars(parsed).items() ]
