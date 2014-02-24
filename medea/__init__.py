@@ -190,8 +190,7 @@ MESOS_ESSENTIAL_ENV = [ "MESOS_SLAVE_ID",     "MESOS_SLAVE_PID",
 
 def mesos_env():
     env = os.environ.get
-    tmp = [ ("MESOS_DIRECTORY", "/tmp") ]
-    return [ (k, env(k)) for k in MESOS_ESSENTIAL_ENV if env(k) ] + tmp
+    return [ (k, env(k)) for k in MESOS_ESSENTIAL_ENV if env(k) ]
 
 def mesos_directory():
     if not "MESOS_DIRECTORY" in os.environ:
