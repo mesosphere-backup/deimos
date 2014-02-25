@@ -17,7 +17,7 @@ def initialize(console=True, syslog=False):
         fmt = "%(asctime)s.%(msecs)03d %(name)s.%(funcName)s %(message)s"
         stderr.setFormatter(logging.Formatter(fmt=fmt, datefmt="%H:%M:%S"))
         root.addHandler(stderr)
-    if syslog: 
+    if syslog:
         dev = "/dev/log" if os.path.exists("/dev/log") else "/var/run/syslog"
         fmt = "%(name)s[%(process)d]: %(funcName)s %(message)s"
         syslog = logging.handlers.SysLogHandler(address=dev)
