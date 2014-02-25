@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 import base64
 import inspect
+import logging
 import os
 import random
 import re
@@ -15,11 +16,13 @@ except: import medea.mesos_pb2 as protos
 import medea.docker
 import medea.cgroups
 from medea.err import *
+import medea.logger
 
 
 ####################################################### Containerizer interface
 
 def launch(container_id, *args):
+    log.info("container = %s", container_id)
     mesos_directory()
     task = protos.TaskInfo()
     task.ParseFromString(sys.stdin.read())
@@ -67,7 +70,7 @@ def launch(container_id, *args):
         with open("stderr", "w") as e:        # concession to 2.6 compatibility
             call = in_sh(runner_argv, allstderr=False)
             try:
-                print >>sys.stderr, "ARGV // " + " ".join(runner_argv)
+                log.info( "ARGV // " + " ".join(runner_argv))
                 runner = subprocess.Popen(call, stdout=o, stderr=e)
                 time.sleep(0.1)
             finally:
@@ -82,10 +85,10 @@ def update(container_id, *args):
     pass
 
 def usage(container_id, *args):
+    log.info("container = %s", container_id)
     name = container_id_as_docker_name(container_id)
     medea.docker.await(name)
     cg = medea.cgroups.CGroups(**medea.docker.cgroups(name))
-    print >>sys.stderr, "CGroups:", " ".join(cg.keys())
     try:
         proto_out(protos.ResourceStatistics,
                   timestamp             = time.time(),
@@ -95,41 +98,42 @@ def usage(container_id, *args):
                   cpus_system_time_secs = cg.cpuacct.system_time(),
                   mem_rss_bytes         = cg.memory.rss())
     except AttributeError as e:
-        print >>sys.stderr, "In usage():", e
+        log.warning("Missing CGroup!", exc_info=True)
         return 1
     return 0
 
 def wait(container_id, *args):
+    log.info("container = %s", container_id)
     name = container_id_as_docker_name(container_id)
     wait = medea.docker.wait(name)
     try:
         medea.docker.await(name)
         info = subprocess.check_output(in_sh(wait, allstderr=False))
     except subprocess.CalledProcessError as e:
-        print >>sys.stderr, "!! Bad exit code (%d):" % e.returncode, wait
+        log.error("Non-zero exit (%d): %r", e.returncode, wait)
         return e.returncode
     try:
         code = int(info)
         if code != 0:
-            print >>sys.stderr, "!! Container exit code:", code
+            log.error("Container exited non-zero: %d", code)
         collapsed = code % 256               # Docker can return negative codes
         proto_out(protos.PluggableTermination,
                   status=collapsed, killed=False, message="wait/docker: ok")
         return 0
     except ValueError as e:
-        print >>sys.stderr, "Failed to parse container exit %s: %s", info, e
+        log.error("Failed to parse Docker output: %s", info, exc_info=True)
     return 1
 
 def destroy(container_id, *args):
+    log.info("container = %s", container_id)
     name = container_id_as_docker_name(container_id)
     medea.docker.await(name)
-    for argv in [medea.docker.stop(name)]: #, medea.docker.rm(name)]:
+    for argv in [medea.docker.stop(name), medea.docker.rm(name)]:
         try:
             subprocess.check_call(in_sh(argv))
         except subprocess.CalledProcessError as e:
-            exit = e.returncode
-            print >>sys.stderr, "!! Bad exit code (%d):" % exit, argv
-            return exit
+            log.error("Non-zero exit (%d): %r", e.returncode, argv)
+            return e.returncode
     proto_out(protos.PluggableStatus, message="destroy/docker: ok")
     return 0
 
@@ -186,7 +190,7 @@ def container_id_as_docker_name(container_id):
         return "mesos." + container_id
     encoded = "mesos." + base64.b16encode(container_id)
     msg = "Creating a safe Docker name for ContainerID %r -> %s"
-    print >>sys.stderr, msg % (container_id, encoded)
+    log.info(msg, container_id, encoded)
     return encoded
 
 MESOS_ESSENTIAL_ENV = [ "MESOS_SLAVE_ID",     "MESOS_SLAVE_PID",
@@ -201,29 +205,28 @@ def mesos_directory():
     work_dir = os.path.abspath(os.getcwd())
     task_dir = os.path.abspath(os.environ["MESOS_DIRECTORY"])
     if task_dir != work_dir:
-        print >>sys.stderr, "Changing directory to MESOS_DIRECTORY=" + task_dir
+        log.info("Changing directory to MESOS_DIRECTORY=%s", task_dir)
         os.chdir(task_dir)
 
 def place_uris(task, directory):
     subprocess.check_call(["mkdir", "-p", directory])
     for item in uris(task):
         uri = item.value
-        print >>sys.stderr, "Retrieving URI: %r" % uri
+        log.info("Retrieving URI: %r", uri)
         try:
             basename = uri.split("/")[-1]
             f = os.path.join(directory, basename)
             if basename == "":
                 raise IndexError
         except IndexError:
-            print >>sys.stderr, "Not able to determine basename: %r" % uri
+            log.info("Not able to determine basename: %r", uri)
             continue
-        cmd = in_sh(["curl", "-sSfL", uri, "--output", f], echo=True)
+        argv = in_sh(["curl", "-sSfL", uri, "--output", f], echo=True)
         try:
-            subprocess.check_call(cmd)
+            subprocess.check_call(argv)
         except subprocess.CalledProcessError as e:
-            msg = "!! While processing URI (%r), bad exit code (%d):"
-            print >>sys.stderr, msg % (e.returncode, uri)
-            print >>sys.stderr, argv
+            log.warning("Non-zero exit (%d): %r", e.returncode, argv)
+            log.warning("Failed while processing URI: %r", uri)
             continue
         if item.executable:
             os.chmod(f, 0755)
@@ -253,7 +256,7 @@ def proto_out(cls, **properties):
     """
     obj = cls()
     for k, v in properties.iteritems():
-        # print >>sys.stderr, "%s.%s" % (cls.__name__, k), "=", v
+        log.debug("%s.%s = %r", cls.__name__, k, v)
         setattr(obj, k, v)
     data = obj.SerializeToString()
     sys.stdout.write(data)
@@ -288,15 +291,21 @@ def cli(argv=None):
         print >>sys.stderr, "** Please specify a subcommand **".center(79)
         return 1
 
-    result = f(*argv[2:])
-    if result is not None:
-        if isinstance(result, int):
-            return result
-        if isinstance(result, str):
-            sys.stdout.write(result)
-        else:
-            for item in result:
-                sys.stdout.write(str(item) + "\n")
+    medea.logger.initialize()
+
+    try:
+        result = f(*argv[2:])
+        if result is not None:
+            if isinstance(result, int):
+                return result
+            if isinstance(result, str):
+                sys.stdout.write(result)
+            else:
+                for item in result:
+                    sys.stdout.write(str(item) + "\n")
+    except Exception:
+        log.error("Failure in subcommand:", exc_info=True)
+        return 2
     return 0
 
 def format_help():
@@ -332,5 +341,7 @@ except:
     subprocess.check_output = check_output
 
 if __name__ == "__main__":
+    log = medea.logger.root
     sys.exit(cli(sys.argv))
-
+else:
+    log = logging.getLogger(__name__)

@@ -1,6 +1,7 @@
 import glob
 import itertools
 import json
+import logging
 import re
 import subprocess
 import sys
@@ -14,7 +15,7 @@ def run(options, image, command=[], env={}, cpus=None, mems=None, ports=[]):
     pairs = [ ("-e", "%s=%s" % (k, v)) for k, v in envs ]
     if ports != []:               # NB: Forces external call to pre-fetch image
         port_pairings = list(itertools.izip_longest(ports, inner_ports(image)))
-        print >>sys.stderr, "Port pairings (Mesos,Docker) //", port_pairings
+        log.info("Port pairings (Mesos, Docker) // %r", port_pairings)
         for allocated, target in port_pairings:
             if allocated is None or target is None: break
             options += [ "-p", "%d:%d" % (allocated, target) ]
@@ -119,5 +120,10 @@ def await(ident, t=0.05, n=10):
         if exists(ident): return
         time.sleep(t)
     if exists(ident): return
-    raise Err("Container is not ready: %s" % ident)
+    log.warning("Container not ready after %d sleeps of %g seconds", n, t)
+    raise AwaitTimeout()
 
+log = logging.getLogger(__name__)
+
+class AwaitTimeout(Err):
+    pass

@@ -1,3 +1,5 @@
+import logging
+
 class _OpenHolder(object):
     def __init__(self, **properties):
         self.__dict__.update(properties)
@@ -14,18 +16,23 @@ class CGroups(_OpenHolder):
         for k, v in cgroups_path_mapping.items():
             properties[k] = construct(v, k)
         _OpenHolder.__init__(self, **properties)
+        log.info(" ".join(self.keys()))
 
 class CGroup(object):
     "A generic CGroup, allowing lookup of CGroup values as Python attributes."
     def __init__(self, path, name):
         self.path = path
         self.name = name
-        self._cache = {}
     def __getattr__(self, key):
         path = self.path + "/" + self.name + "." + key
-        with open(path) as h:
-            data = h.read()
-        return data
+        try:
+            with open(path) as h:
+                data = h.read()
+            return data
+        except OSError as e:
+            if e.errno != errno.ENOENT: raise e
+            log.warning("Could not read %s.%s (%s)", self.name, key, path)
+            return None
     def stat_data(self):
         return StatFile(self.stat)
 
@@ -36,6 +43,7 @@ def construct(path, name=None):
                 "cpu"     : CPU,
                 "cpuacct" : CPUAcct }
     constructor = classes.get(name, CGroup)
+    log.debug("Chose %s for: %s", constructor.__name__, path)
     return constructor(path, name)
 
 class Memory(CGroup):
@@ -69,4 +77,7 @@ class StatFile(_OpenHolder):
             k, v = kvs
             res[k] = v
         _OpenHolder.__init__(self, **res)
+
+
+log = logging.getLogger(__name__)
 
