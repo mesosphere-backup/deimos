@@ -119,5 +119,5 @@ def await(ident, t=0.05, n=10):
         if exists(ident): return
         time.sleep(t)
     if exists(ident): return
-    raise Err("Wait timed out: %s" % ident)
+    raise Err("Container is not ready: %s" % ident)
 
