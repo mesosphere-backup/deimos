@@ -4,6 +4,9 @@ import json
 import re
 import subprocess
 import sys
+import time
+
+from medea.err import *
 
 
 def run(options, image, command=[], env={}, cpus=None, mems=None, ports=[]):
@@ -100,4 +103,21 @@ def cgroups(ident):
 def canonical_id(ident):
     argv = ["docker", "inspect", "--format={{.ID}}", ident]
     return subprocess.check_output(argv).strip()
+
+def exists(ident):
+    try:
+        argv = ["docker", "inspect", "--format={{.ID}}", ident]
+        with open("/dev/null", "w") as dev_null:
+            subprocess.check_call(argv, stdout=dev_null, stderr=dev_null)
+    except subprocess.CalledProcessError as e:
+        if e.returncode != 1: raise e
+        return False
+    return True
+
+def await(ident, t=0.05, n=10):
+    for _ in range(0, n):
+        if exists(ident): return
+        time.sleep(t)
+    if exists(ident): return
+    raise Err("Wait timed out: %s" % ident)
 

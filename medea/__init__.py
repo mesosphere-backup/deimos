@@ -14,6 +14,7 @@ except: import medea.mesos_pb2 as protos
 
 import medea.docker
 import medea.cgroups
+from medea.err import *
 
 
 ####################################################### Containerizer interface
@@ -39,7 +40,7 @@ def launch(container_id, *args):
     # the bind path in the container with a colon, but the absolute path to
     # the Mesos sandbox might have colons in it (TaskIDs with timestamps can
     # cause this situation). So we create a soft link to it and mount that.
-    sandbox_softlink = "/tmp/medea-fs-sandbox.%016x" % random.getrandbits(64)
+    sandbox_softlink = "/tmp/medes-fs." + docker_name
     subprocess.check_call(["ln", "-s", os.path.abspath("fs"), sandbox_softlink])
     run_options += [ "-v", "%s:%s" % (sandbox_softlink, sandbox_mountpoint) ]
 
@@ -53,7 +54,7 @@ def launch(container_id, *args):
     # executor.
     if needs_executor_wrapper(task):
         if not(len(args) > 1 and args[0] == "--mesos-executor"):
-            raise RuntimeError("This task needs --mesos-executor to be set!")
+            raise Err("This task needs --mesos-executor to be set!")
         runner_argv = [args[1]]
     else:
         env += mesos_env() + [("MESOS_DIRECTORY", sandbox_mountpoint)]
@@ -77,12 +78,14 @@ def launch(container_id, *args):
     return runner_code
 
 def update(container_id, *args):
+    # medea.docker.await(name)
     pass
 
 def usage(container_id, *args):
     name = container_id_as_docker_name(container_id)
-    cg   = medea.cgroups.CGroups(**medea.docker.cgroups(name))
-    print >>sys.stderr, "Found CGroups:", " ".join(cg.keys())
+    medea.docker.await(name)
+    cg = medea.cgroups.CGroups(**medea.docker.cgroups(name))
+    print >>sys.stderr, "CGroups:", " ".join(cg.keys())
     try:
         proto_out(protos.ResourceStatistics,
                   timestamp             = time.time(),
@@ -100,7 +103,7 @@ def wait(container_id, *args):
     name = container_id_as_docker_name(container_id)
     wait = medea.docker.wait(name)
     try:
-        # Container hasn't started yet ... what do?
+        medea.docker.await(name)
         info = subprocess.check_output(in_sh(wait, allstderr=False))
     except subprocess.CalledProcessError as e:
         print >>sys.stderr, "!! Bad exit code (%d):" % e.returncode, wait
@@ -119,6 +122,7 @@ def wait(container_id, *args):
 
 def destroy(container_id, *args):
     name = container_id_as_docker_name(container_id)
+    medea.docker.await(name)
     for argv in [medea.docker.stop(name)]: #, medea.docker.rm(name)]:
         try:
             subprocess.check_call(in_sh(argv))
@@ -179,9 +183,9 @@ def needs_executor_wrapper(task):
 
 def container_id_as_docker_name(container_id):
     if re.match(r"^[a-zA-Z0-9.-]+$", container_id):
-        return container_id
-    encoded = "mesos-" + base64.b16encode(container_id)
-    msg = "Creating a safe Docker name for ContainerID %s -> %s"
+        return "mesos." + container_id
+    encoded = "mesos." + base64.b16encode(container_id)
+    msg = "Creating a safe Docker name for ContainerID %r -> %s"
     print >>sys.stderr, msg % (container_id, encoded)
     return encoded
 
@@ -193,12 +197,11 @@ def mesos_env():
     return [ (k, env(k)) for k in MESOS_ESSENTIAL_ENV if env(k) ]
 
 def mesos_directory():
-    if not "MESOS_DIRECTORY" in os.environ:
-        return
+    if not "MESOS_DIRECTORY" in os.environ: return
     work_dir = os.path.abspath(os.getcwd())
     task_dir = os.path.abspath(os.environ["MESOS_DIRECTORY"])
     if task_dir != work_dir:
-        print >>sys.stderr, "Changing directory to MESOS_DIRECTORY"
+        print >>sys.stderr, "Changing directory to MESOS_DIRECTORY=" + task_dir
         os.chdir(task_dir)
 
 def place_uris(task, directory):
@@ -327,10 +330,6 @@ except:
             raise subprocess.CalledProcessError(exitcode, args[0])
         return stdout
     subprocess.check_output = check_output
-
-class Err(RuntimeError):
-    pass
-
 
 if __name__ == "__main__":
     sys.exit(cli(sys.argv))
