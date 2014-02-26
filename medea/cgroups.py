@@ -1,5 +1,8 @@
 import logging
 
+from medea.logger import log
+
+
 class _OpenHolder(object):
     def __init__(self, **properties):
         self.__dict__.update(properties)
@@ -16,7 +19,7 @@ class CGroups(_OpenHolder):
         for k, v in cgroups_path_mapping.items():
             properties[k] = construct(v, k)
         _OpenHolder.__init__(self, **properties)
-        log.info(" ".join(self.keys()))
+        log.debug(" ".join(self.keys()))
 
 class CGroup(object):
     "A generic CGroup, allowing lookup of CGroup values as Python attributes."
@@ -77,7 +80,4 @@ class StatFile(_OpenHolder):
             k, v = kvs
             res[k] = v
         _OpenHolder.__init__(self, **res)
-
-
-log = logging.getLogger(__name__)
 

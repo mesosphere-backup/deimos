@@ -1,9 +1,24 @@
+import inspect
 import logging
 import logging.handlers
 import os
 
 
 root = logging.getLogger("medea")
+
+class log(): # Really just a namespace
+    @staticmethod
+    def debug(*args, **opts):    logger(2).debug(*args, **opts)
+    @staticmethod
+    def info(*args, **opts):     logger(2).info(*args, **opts)
+    @staticmethod
+    def warning(*args, **opts):  logger(2).warning(*args, **opts)
+    @staticmethod
+    def error(*args, **opts):    logger(2).error(*args, **opts)
+    @staticmethod
+    def critical(*args, **opts): logger(2).critical(*args, **opts)
+    @staticmethod
+    def log(*args, **opts):      logger(2).log(*args, **opts)
 
 def initialize(console=True, syslog=False, level=logging.DEBUG):
     global _settings
@@ -14,16 +29,31 @@ def initialize(console=True, syslog=False, level=logging.DEBUG):
     root.setLevel(level)
     if console:
         stderr = logging.StreamHandler()
-        fmt = "%(asctime)s.%(msecs)03d %(name)s.%(funcName)s %(message)s"
+        fmt = "%(asctime)s.%(msecs)03d %(name)s %(message)s"
         stderr.setFormatter(logging.Formatter(fmt=fmt, datefmt="%H:%M:%S"))
         root.addHandler(stderr)
     if syslog:
         dev = "/dev/log" if os.path.exists("/dev/log") else "/var/run/syslog"
-        fmt = "%(name)s[%(process)d]: %(funcName)s %(message)s"
+        fmt = "medea[%(process)d]: %(name)s %(message)s"
         syslog = logging.handlers.SysLogHandler(address=dev)
         syslog.setFormatter(logging.Formatter(fmt=fmt))
         root.addHandler(syslog)
     root.removeHandler(_null_handler)
+
+def logger(height=1):                 # http://stackoverflow.com/a/900404/48251
+    """
+    Obtain a function logger for the calling function. Uses the inspect module
+    to find the name of the calling function and its position in the module
+    hierarchy. With the optional height argument, logs for caller's caller, and
+    so forth.
+    """
+    caller   = inspect.stack()[height]
+    scope    = caller[0].f_globals
+    function = caller[3]
+    path     = scope["__name__"]
+    if path == "__main__" and scope["__package__"]:
+        path = scope["__package__"]
+    return logging.getLogger(path + "." + function + "()")
 
 _initialized = False
 

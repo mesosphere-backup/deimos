@@ -7,7 +7,9 @@ import subprocess
 import sys
 import time
 
+from medea.cmd import Run
 from medea.err import *
+from medea.logger import log
 
 
 def run(options, image, command=[], env={}, cpus=None, mems=None, ports=[]):
@@ -39,7 +41,7 @@ def wait(ident):
 images = {} ######################################## Cache of image information
 
 def pull(image):
-    subprocess.check_call(["docker", "pull", image])
+    Run(data=True)(["docker", "pull", image])
     refresh_docker_image_info(image)
 
 def pull_once(image):
@@ -53,12 +55,13 @@ def image_info(image):
         return refresh_docker_image_info(image)
 
 def refresh_docker_image_info(image):
+    runner  = Run(data=True)
     delim   = re.compile("  +")
-    text    = subprocess.check_output(["docker", "images", image])
+    text    = runner(["docker", "images", image])
     records = [ delim.split(line) for line in text.splitlines() ]
     for record in records:
         if record[0] == image:
-            text   = subprocess.check_output(["docker", "inspect", image])
+            text   = runner(["docker", "inspect", image])
             parsed = json.loads(text)[0]
             images[image] = parsed
             return parsed
@@ -95,7 +98,7 @@ def root_pid(ident):
                         cut -d" " -f1                       # Keep only the PID
                     """
     argv = ["sh", "-c", fetch_lxc_pid.strip(), "sh", canonical_id(ident)]
-    return subprocess.check_output(argv).strip()
+    return Run(data=True)(argv).strip()
 
 def cgroups(ident):
     paths = glob.glob("/sys/fs/cgroup/*/" + canonical_id(ident))
@@ -103,27 +106,27 @@ def cgroups(ident):
 
 def canonical_id(ident):
     argv = ["docker", "inspect", "--format={{.ID}}", ident]
-    return subprocess.check_output(argv).strip()
+    return Run(data=True)(argv).strip()
 
-def exists(ident):
+def exists(ident, quiet=False):
     try:
         argv = ["docker", "inspect", "--format={{.ID}}", ident]
+        level = logging.DEBUG if quiet else logging.WARNING
         with open("/dev/null", "w") as dev_null:
-            subprocess.check_call(argv, stdout=dev_null, stderr=dev_null)
+            Run(error_level=level)(argv, stdout=dev_null, stderr=dev_null)
     except subprocess.CalledProcessError as e:
         if e.returncode != 1: raise e
         return False
     return True
 
-def await(ident, t=0.05, n=10):
+def await(ident, t=0.05, n=10, terminal=False):
     for _ in range(0, n):
-        if exists(ident): return
+        if exists(ident, quiet=True): break
         time.sleep(t)
     if exists(ident): return
-    log.warning("Container not ready after %d sleeps of %g seconds", n, t)
-    raise AwaitTimeout()
-
-log = logging.getLogger(__name__)
+    msg = "Container %s not ready after %d sleeps of %g seconds"
+    log.warning(msg % (ident, n, t))
+    raise AwaitTimeout("Timed out waiting for %s" % ident)
 
 class AwaitTimeout(Err):
     pass

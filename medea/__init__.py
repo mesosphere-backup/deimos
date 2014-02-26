@@ -18,11 +18,14 @@ import medea.docker
 import medea.cgroups
 from medea.err import *
 import medea.logger
+from medea.logger import log
+import medea.cmd
 
 
 ####################################################### Containerizer interface
 
 def launch(container_id, *args):
+    cmd = medea.cmd.Run()
     log.info(" ".join([container_id] + list(args)))
     install_signal_handler(container_id, signal.SIGINT, signal.SIGTERM)
     mesos_directory()
@@ -35,7 +38,7 @@ def launch(container_id, *args):
     if image == "":
         image = matching_docker_for_host()
     docker_name = container_id_as_docker_name(container_id)
-    run_options = ["--name", docker_name]
+    run_options = [ "--name", docker_name ]
 
     place_uris(task, "fs")
     sandbox_mountpoint = "/tmp/mesos-sandbox/"
@@ -46,7 +49,7 @@ def launch(container_id, *args):
     # the Mesos sandbox might have colons in it (TaskIDs with timestamps can
     # cause this situation). So we create a soft link to it and mount that.
     sandbox_softlink = "/tmp/medes-fs." + docker_name
-    subprocess.check_call(["ln", "-s", os.path.abspath("fs"), sandbox_softlink])
+    cmd(["ln", "-s", os.path.abspath("fs"), sandbox_softlink])
     run_options += [ "-v", "%s:%s" % (sandbox_softlink, sandbox_mountpoint) ]
 
     cpus, mems = cpu_and_mem(task)
@@ -70,15 +73,16 @@ def launch(container_id, *args):
 
     with open("stdout", "w") as o:            # This awkward double 'with' is a
         with open("stderr", "w") as e:        # concession to 2.6 compatibility
-            call = in_sh(runner_argv, allstderr=False)
+            call = medea.cmd.in_sh(runner_argv, allstderr=False)
             try:
-                log.info( "ARGV // " + " ".join(runner_argv))
+                log.info(medea.cmd.present(runner_argv))
                 runner = subprocess.Popen(call, stdout=o, stderr=e)
                 time.sleep(0.1)
             finally:
-                subprocess.check_call(["rm", "-f", sandbox_softlink])
+                cmd(["rm", "-f", sandbox_softlink])
             proto_out(protos.PluggableStatus, message="launch/docker: ok")
-            os.close(1)    # Must use "low-level" call to force close of stdout
+            sys.stdout.close()          # Mark STDOUT as closed for Python code
+            os.close(1)         # Use low-level call to close OS side of STDOUT
             runner_code = runner.wait()
     return runner_code
 
@@ -87,6 +91,8 @@ def usage(container_id, *args):
     name = container_id_as_docker_name(container_id)
     medea.docker.await(name)
     cg = medea.cgroups.CGroups(**medea.docker.cgroups(name))
+    if len(cg.keys()) == 0:
+        raise Err("No CGroups found: %s" % container_id)
     try:
         proto_out(protos.ResourceStatistics,
                   timestamp             = time.time(),
@@ -96,21 +102,26 @@ def usage(container_id, *args):
                   cpus_system_time_secs = cg.cpuacct.system_time(),
                   mem_rss_bytes         = cg.memory.rss())
     except AttributeError as e:
-        log.warning("Missing CGroup!", exc_info=True)
-        return 1
+        log.error("Missing CGroup!")
+        raise e
     return 0
 
 def destroy(container_id, *args):
+    cmd = medea.cmd.Run()
     log.info(" ".join([container_id] + list(args)))
     name = container_id_as_docker_name(container_id)
     medea.docker.await(name)
     for argv in [medea.docker.stop(name), medea.docker.rm(name)]:
         try:
-            subprocess.check_call(in_sh(argv))
+            cmd(argv)
         except subprocess.CalledProcessError as e:
             log.error("Non-zero exit (%d): %r", e.returncode, argv)
             return e.returncode
-    proto_out(protos.PluggableStatus, message="destroy/docker: ok")
+    if not sys.stdout.closed:
+        # If we're called as part of the signal handler set up by launch,
+        # STDOUT is probably closed already. Writing the Protobuf would only
+        # result in a bevy of error messages.
+        proto_out(protos.PluggableStatus, message="destroy/docker: ok")
     return 0
 
 
@@ -185,7 +196,8 @@ def mesos_directory():
         os.chdir(task_dir)
 
 def place_uris(task, directory):
-    subprocess.check_call(["mkdir", "-p", directory])
+    cmd = medea.cmd.Run()
+    cmd(["mkdir", "-p", directory])
     for item in uris(task):
         uri = item.value
         log.info("Retrieving URI: %r", uri)
@@ -197,9 +209,8 @@ def place_uris(task, directory):
         except IndexError:
             log.info("Not able to determine basename: %r", uri)
             continue
-        argv = in_sh(["curl", "-sSfL", uri, "--output", f], echo=True)
         try:
-            subprocess.check_call(argv)
+            cmd(["curl", "-sSfL", uri, "--output", f])
         except subprocess.CalledProcessError as e:
             log.warning("Non-zero exit (%d): %r", e.returncode, argv)
             log.warning("Failed while processing URI: %r", uri)
@@ -209,20 +220,6 @@ def place_uris(task, directory):
 
 
 ####################################################### IO & system interaction
-
-def in_sh(argv, allstderr=True, echo=False):
-    """
-    Provides better error messages in case of file not found or permission
-    denied. Note that this has nothing at all to do with shell=True, since
-    quoting prevents the shell from interpreting any arguments -- they are
-    passed straight on to shell exec.
-    """
-    # NB: The use of single and double quotes in constructing the call really
-    #     matters.
-    call =  'echo ARGV // "$@" >&2 && ' if echo else ""
-    call += 'exec "$@"'
-    call += " >&2" if allstderr else ""
-    return ["/bin/sh", "-c", call, "sh"] + argv
 
 def proto_out(cls, **properties):
     """
@@ -239,7 +236,7 @@ def proto_out(cls, **properties):
     sys.stdout.flush()
 
 def matching_docker_for_host():
-    return subprocess.check_output(["bash", "-c", """
+    return medea.cmd.Run(data=True)(["bash", "-c", """
         [[ ! -s /etc/os-release ]] ||
         ( source /etc/os-release && tr A-Z a-z <<<"$ID":"$VERSION_ID" )
     """]).strip()
@@ -289,9 +286,12 @@ def cli(argv=None):
             else:
                 for item in result:
                     sys.stdout.write(str(item) + "\n")
+    except Err as e:
+        log.error(str(e))
+        return 4
     except Exception:
         log.error("Failure in subcommand:", exc_info=True)
-        return 2
+        return 8
     return 0
 
 def format_help():
@@ -310,23 +310,6 @@ def format_help():
   remaining forms are effectively no-ops, returning 0 and sending back 0 bytes
   of data, allowing Mesos to use its default behaviour.
 """.strip("\n")
-
-# This try block is here to upgrade functionality available the subprocess
-# module for older versions of Python. As last as 2.6, subprocess did not have
-# the check_output function.
-try:
-    subprocess.check_output
-except:
-    def check_output(*args):
-        p = subprocess.Popen(stdout=subprocess.PIPE, *args)
-        stdout = p.communicate()[0]
-        exitcode = p.wait()
-        if exitcode:
-            raise subprocess.CalledProcessError(exitcode, args[0])
-        return stdout
-    subprocess.check_output = check_output
-
-log = medea.logger.root
 
 if __name__ == "__main__":
     sys.exit(cli(sys.argv))
