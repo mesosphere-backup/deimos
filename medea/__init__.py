@@ -23,7 +23,7 @@ import medea.logger
 ####################################################### Containerizer interface
 
 def launch(container_id, *args):
-    log.info(" ".join([container_id] + args))
+    log.info(" ".join([container_id] + list(args)))
     install_signal_handler(container_id, signal.SIGINT, signal.SIGTERM)
     mesos_directory()
     task = protos.TaskInfo()
@@ -87,7 +87,7 @@ def update(container_id, *args):
     pass
 
 def usage(container_id, *args):
-    log.info("container = %s", container_id)
+    log.info(" ".join([container_id] + list(args)))
     name = container_id_as_docker_name(container_id)
     medea.docker.await(name)
     cg = medea.cgroups.CGroups(**medea.docker.cgroups(name))
@@ -105,7 +105,7 @@ def usage(container_id, *args):
     return 0
 
 def wait(container_id, *args):
-    log.info("container = %s", container_id)
+    log.info(" ".join([container_id] + list(args)))
     name = container_id_as_docker_name(container_id)
     wait = medea.docker.wait(name)
     try:
@@ -127,7 +127,7 @@ def wait(container_id, *args):
     return 1
 
 def destroy(container_id, *args):
-    log.info("container = %s", container_id)
+    log.info(" ".join([container_id] + list(args)))
     name = container_id_as_docker_name(container_id)
     medea.docker.await(name)
     for argv in [medea.docker.stop(name), medea.docker.rm(name)]:
@@ -300,7 +300,10 @@ def cli(argv=None):
         print >>sys.stderr, "** Please specify a subcommand **".center(79)
         return 1
 
-    medea.logger.initialize()
+    if sys.stdout.isatty():
+        medea.logger.initialize()
+    else:
+        medea.logger.initialize(console=False, syslog=True, level=logging.INFO)
 
     try:
         result = f(*argv[2:])
@@ -349,8 +352,7 @@ except:
         return stdout
     subprocess.check_output = check_output
 
+log = medea.logger.root
+
 if __name__ == "__main__":
-    log = medea.logger.root
     sys.exit(cli(sys.argv))
-else:
-    log = logging.getLogger(__name__)

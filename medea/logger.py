@@ -5,13 +5,13 @@ import os
 
 root = logging.getLogger("medea")
 
-def initialize(console=True, syslog=False):
+def initialize(console=True, syslog=False, level=logging.DEBUG):
     global _settings
     global _initialized
     if _initialized: return
     _settings = locals()
     _initialized = True
-    root.setLevel(logging.DEBUG)
+    root.setLevel(level)
     if console:
         stderr = logging.StreamHandler()
         fmt = "%(asctime)s.%(msecs)03d %(name)s.%(funcName)s %(message)s"
