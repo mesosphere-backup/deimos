@@ -82,10 +82,6 @@ def launch(container_id, *args):
             runner_code = runner.wait()
     return runner_code
 
-def update(container_id, *args):
-    # medea.docker.await(name)
-    pass
-
 def usage(container_id, *args):
     log.info(" ".join([container_id] + list(args)))
     name = container_id_as_docker_name(container_id)
@@ -103,28 +99,6 @@ def usage(container_id, *args):
         log.warning("Missing CGroup!", exc_info=True)
         return 1
     return 0
-
-def wait(container_id, *args):
-    log.info(" ".join([container_id] + list(args)))
-    name = container_id_as_docker_name(container_id)
-    wait = medea.docker.wait(name)
-    try:
-        medea.docker.await(name)
-        info = subprocess.check_output(in_sh(wait, allstderr=False))
-    except subprocess.CalledProcessError as e:
-        log.error("Non-zero exit (%d): %r", e.returncode, wait)
-        return e.returncode
-    try:
-        code = int(info)
-        if code != 0:
-            log.error("Container exited non-zero: %d", code)
-        collapsed = code % 256               # Docker can return negative codes
-        proto_out(protos.PluggableTermination,
-                  status=collapsed, killed=False, message="wait/docker: ok")
-        return 0
-    except ValueError as e:
-        log.error("Failed to parse Docker output: %s", info, exc_info=True)
-    return 1
 
 def destroy(container_id, *args):
     log.info(" ".join([container_id] + list(args)))
@@ -289,11 +263,11 @@ def cli(argv=None):
         print format_help()
         return 0
 
-    f = { "launch":  launch,
-          "update":  update,
-          "usage":   usage,
-          "wait":    wait,
-          "destroy": destroy }.get(sub)
+    f = { "launch"  : launch,
+          "update"  : lambda *args: None,
+          "usage"   : usage,
+          "wait"    : lambda *args: None,
+          "destroy" : destroy }.get(sub)
 
     if f is None:
         print >>sys.stderr, format_help()
