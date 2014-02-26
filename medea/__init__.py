@@ -6,6 +6,7 @@ import logging
 import os
 import random
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -22,7 +23,8 @@ import medea.logger
 ####################################################### Containerizer interface
 
 def launch(container_id, *args):
-    log.info("container = %s", container_id)
+    log.info(" ".join([container_id] + args))
+    install_signal_handler(container_id, signal.SIGINT, signal.SIGTERM)
     mesos_directory()
     task = protos.TaskInfo()
     task.ParseFromString(sys.stdin.read())
@@ -267,6 +269,13 @@ def matching_docker_for_host():
         [[ ! -s /etc/os-release ]] ||
         ( source /etc/os-release && tr A-Z a-z <<<"$ID":"$VERSION_ID" )
     """]).strip()
+
+def install_signal_handler(container_id, *signals):
+    def handler(signum, _):
+        log.warning("Signal: " + str(signum))
+        destroy(container_id)
+        os._exit(-signum)
+    for _ in signals: signal.signal(_, handler)
 
 
 ##################################################### CLI, errors, Python stuff

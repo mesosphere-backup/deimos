@@ -4,6 +4,7 @@ import collections
 import os
 import logging
 import random
+import signal
 import sys
 import time
 
@@ -248,5 +249,10 @@ logging.basicConfig(format="%(asctime)s.%(msecs)03d %(name)s %(message)s",
                     datefmt="%H:%M:%S", level=logging.DEBUG)
 log = logging.getLogger("medea-test")
 
-if __name__ == "__main__": cli()
+if __name__ == "__main__":
+    def handler(signum, _):
+        log.warning("Signal: " + str(signum))
+        os._exit(-signum)
+    signal.signal(signal.SIGINT, handler)
+    cli()
 
