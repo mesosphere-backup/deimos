@@ -32,8 +32,11 @@ class Scheduler(mesos.Scheduler):
         self.log.info("Registered with ID:\n  %s" % framework_id.value)
     def statusUpdate(self, driver, update):
         task, code = update.task_id.value, update.state
-        self.statuses[task] = code
-        self.loggers[task].info(present_status(update))
+        if self.statuses.get(task, None) in Scheduler.terminal:
+            self.loggers[task].info(present_status(update) + " (redundant)")
+        else:
+            self.loggers[task].info(present_status(update))
+            self.statuses[task] = code
     def all_tasks_done(self):
         agg = [_ for _ in self.statuses.values() if _ in Scheduler.terminal]
         return len(agg) >= self.trials
@@ -227,7 +230,7 @@ def cli():
     scheduler_class = schedulers[parsed.test]
     scheduler = scheduler_class(**constructor_args)
     args = ", ".join( "%s=%r" % (k, v) for k, v in constructor_args.items() )
-    scheduler.log.info("Using %s(%s)" % (scheduler_class.__name__, args))
+    log.info("Testing: %s(%s)" % (scheduler_class.__name__, args))
 
     framework = mesos_pb2.FrameworkInfo()
     framework.name = "medea-test"
@@ -239,10 +242,13 @@ def cli():
     ################  2 => driver problem  1 => tests failed  0 => tests passed
     if code != mesos_pb2.DRIVER_STOPPED:
         log.error("Driver died in an anomalous state")
+        log.info("Aborted: %s(%s)" % (scheduler_class.__name__, args))
         os._exit(2)
     if any(_ in Scheduler.failed for _ in scheduler.statuses.values()):
         log.error("Test run failed -- not all tasks made it")
+        log.info("Failure: %s(%s)" % (scheduler_class.__name__, args))
         os._exit(1)
+    log.info("Success: %s(%s)" % (scheduler_class.__name__, args))
     os._exit(0)
 
 logging.basicConfig(format="%(asctime)s.%(msecs)03d %(name)s %(message)s",

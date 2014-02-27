@@ -1,0 +1,91 @@
+#!/bin/bash
+set -o errexit -o nounset -o pipefail
+function -h {
+cat <<USAGE
+ USAGE: test-suite <Mesos master URL>
+        test-suite short <Mesos master URL>
+        test-suite long <Mesos master URL>
+
+  Run a suite of integration tests. By default, the short suite of tests is
+  run.
+
+USAGE
+}; function --help { -h ;}                 # A nice way to handle -h and --help
+export LC_ALL=en_US.UTF-8                    # A locale that works consistently
+
+function main {
+  preamble >&2
+  short "$@"
+}
+
+function globals {
+  this="$(dirname "$0")"
+}; globals
+
+function preamble {
+cat <<\EOF
+You may need to set some environment variables to point to your Mesos build:
+
+  # The distribute and proto eggs aren't strictly necessary.
+  PYTHONPATH=/path/to/mesos/build/src/python/dist/mesos-*.egg
+
+You probably won't need to set MESOS_NATIVE_LIBRARY.
+EOF
+}
+
+function short {
+  harness 60 short_tests "$@"
+}
+
+function long {
+  harness 300 long_tests "$@"
+}
+
+function harness {
+  local timeout="$1" ; shift
+  msg "**** Test suite will timeout in $timeout seconds"
+  ( cd "$this" && "$@" ) &
+  local worker_process=$!
+  trap "killtree $worker_process" TERM INT
+  ( trap 'exit 0' TERM
+    sleep "$timeout"
+    killtree "$worker_process" ) &>/dev/null &
+  local term_process=$!
+  trap "killtree $worker_process || true ; killtree $term_process" TERM INT
+  wait "$worker_process" && local code=$? || local code=$?
+  killtree "$term_process" || true
+  [[ $code = 0 ]] && msg "**** SUCCESS" || msg "**** FAILURE"
+  return "$code"
+}
+
+function short_tests {
+  ./medea-test.py --master "$1" --test sleep --test.sleep  2 --test.trials  4
+  ./medea-test.py --master "$1" --test pg                    --test.trials  5
+}
+
+function long_tests {
+  short_tests
+  ./medea-test.py --master "$1" --test sleep --test.sleep 10 --test.trials 10
+}
+
+function killtree {
+  kill -STOP "$1" &>/dev/null
+  ps -e -o pid= -o ppid= | while read -r pid ppid
+                           do
+                             [[ $ppid = $1 ]] || continue
+                             killtree "$pid"  || true
+                           done
+  kill -CONT "$1" &>/dev/null
+  kill -TERM "$1" &>/dev/null
+}
+
+function msg { out "$*" >&2 ;}
+function err { local x=$? ; msg "$*" ; return $(( $x == 0 ? 1 : $x )) ;}
+function out { printf '%s\n' "$*" ;}
+
+######################### Delegates to subcommands or runs main, as appropriate
+if [[ ${1:-} ]] && declare -F | cut -d' ' -f3 | fgrep -qx -- "${1:-}"
+then "$@"
+else main "$@"
+fi
+
