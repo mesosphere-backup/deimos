@@ -8,36 +8,40 @@ root = logging.getLogger("medea")
 
 class log(): # Really just a namespace
     @staticmethod
-    def debug(*args, **opts):    logger(2).debug(*args, **opts)
+    def debug(*args, **opts):     logger(2).debug(*args, **opts)
     @staticmethod
-    def info(*args, **opts):     logger(2).info(*args, **opts)
+    def info(*args, **opts):      logger(2).info(*args, **opts)
     @staticmethod
-    def warning(*args, **opts):  logger(2).warning(*args, **opts)
+    def warning(*args, **opts):   logger(2).warning(*args, **opts)
     @staticmethod
-    def error(*args, **opts):    logger(2).error(*args, **opts)
+    def error(*args, **opts):     logger(2).error(*args, **opts)
     @staticmethod
-    def critical(*args, **opts): logger(2).critical(*args, **opts)
+    def critical(*args, **opts):  logger(2).critical(*args, **opts)
     @staticmethod
-    def log(*args, **opts):      logger(2).log(*args, **opts)
+    def exception(*args, **opts): logger(2).exception(*args, **opts)
+    @staticmethod
+    def log(*args, **opts):       logger(2).log(*args, **opts)
 
-def initialize(console=True, syslog=False, level=logging.DEBUG):
+def initialize(console=logging.DEBUG, syslog=logging.INFO):
     global _settings
     global _initialized
     if _initialized: return
     _settings = locals()
     _initialized = True
-    root.setLevel(level)
+    root.setLevel(min(console, syslog))
     if console:
         stderr = logging.StreamHandler()
         fmt = "%(asctime)s.%(msecs)03d %(name)s %(message)s"
         stderr.setFormatter(logging.Formatter(fmt=fmt, datefmt="%H:%M:%S"))
+        stderr.setLevel(console)
         root.addHandler(stderr)
     if syslog:
         dev = "/dev/log" if os.path.exists("/dev/log") else "/var/run/syslog"
         fmt = "medea[%(process)d]: %(name)s %(message)s"
-        syslog = logging.handlers.SysLogHandler(address=dev)
-        syslog.setFormatter(logging.Formatter(fmt=fmt))
-        root.addHandler(syslog)
+        logger = logging.handlers.SysLogHandler(address=dev)
+        logger.setFormatter(logging.Formatter(fmt=fmt))
+        logger.setLevel(syslog)
+        root.addHandler(logger)
     root.removeHandler(_null_handler)
 
 def logger(height=1):                 # http://stackoverflow.com/a/900404/48251

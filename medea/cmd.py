@@ -4,6 +4,7 @@ import subprocess
 import sys
 
 import medea.logger
+from medea.err import *
 
 
 class Run(object):
@@ -27,7 +28,7 @@ class Run(object):
             return result
         except subprocess.CalledProcessError as e:
             self.log.log(self.error_level, present(argv, e.returncode))
-            raise e
+            raise Err("External command failure")
 
 def present(argv, exit=None):
     if exit:

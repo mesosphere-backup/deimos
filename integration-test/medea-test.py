@@ -6,6 +6,7 @@ import logging
 import random
 import signal
 import sys
+import threading
 import time
 
 import google.protobuf as pb
@@ -50,7 +51,7 @@ class Scheduler(mesos.Scheduler):
         return [ (mesos_pb2.TaskState.Name(code), count)
                  for code, count in counts.items() ]
     def next_task_id(self):
-        short_id = "%s-task%02d" % (self.token, len(self.tasks))
+        short_id = "%s.task-%02d" % (self.token, len(self.tasks))
         long_id  = "medea-test." + short_id
         self.loggers[long_id] = log.getChild(short_id)
         return long_id
@@ -62,33 +63,6 @@ class Scheduler(mesos.Scheduler):
                      mesos_pb2.TASK_KILLED,
                      mesos_pb2.TASK_LOST ])
 
-class ExecutorScheduler(Scheduler):                # TODO: Make this class work
-    def __init__(self, command, uris=[], container=None, trials=10):
-        Scheduler.__init__(self, trials)
-        self.command   = command
-        self.uris      = uris
-        self.container = container
-        self.messages  = []
-    def statusUpdate(self, driver, update):
-        super(ExecutorScheduler, self).statusUpdate(driver, update)
-        if update.state == mesos_pb2.TASK_RUNNING:
-            pass                  # TODO: Send a message if we get TASK_RUNNING
-        if self.all_tasks_done():
-            self.sum_up()
-            driver.stop()
-    def frameworkMessage(self, driver, executor_id, slave_id, msg):
-        self.messages += [msg]
-        driver.killTask(update.task_id)
-    def resourceOffers(self, driver, offers):
-        for offer in offers:
-            if len(self.tasks) >= self.trials: break
-            tid  = self.next_task_id()
-            sid  = offer.slave_id
-            task = task_with_executor(tid, sid)
-            self.tasks += [task]
-            self.loggers[tid].info(present_task(task))
-            driver.launchTasks(offer.id, [task])
-
 class SleepScheduler(Scheduler):
     wiki = "https://en.wikipedia.org/wiki/Main_Page"
     def __init__(self, sleep=10, uris=[wiki], container=None, trials=5):
@@ -98,7 +72,7 @@ class SleepScheduler(Scheduler):
         self.container = container
         self.done      = []
     def statusUpdate(self, driver, update):
-        super(SleepScheduler, self).statusUpdate(driver, update)
+        super(type(self), self).statusUpdate(driver, update)
         if self.all_tasks_done():
             self.sum_up()
             driver.stop()
@@ -121,7 +95,7 @@ class PGScheduler(Scheduler):
         Scheduler.__init__(self, trials)
         self.container = container
     def statusUpdate(self, driver, update):
-        super(PGScheduler, self).statusUpdate(driver, update)
+        super(type(self), self).statusUpdate(driver, update)
         if update.state == mesos_pb2.TASK_RUNNING:
             time.sleep(2)
             driver.killTask(update.task_id)       # Shutdown Postgres container
@@ -139,14 +113,71 @@ class PGScheduler(Scheduler):
             self.loggers[tid].info(present_task(task))
             driver.launchTasks(offer.id, [task])
 
+class ExecutorScheduler(Scheduler):
+    sh = "python medea-test.py --executor"
+    this = "file://" + os.path.abspath(__file__)
+    libmesos = "docker:///mesosphere/libmesos"
+    shutdown_message = "shutdown"
+    def __init__(self, command=sh, uris=[this], container=libmesos, trials=10):
+        Scheduler.__init__(self, trials)
+        self.command   = command
+        self.uris      = uris
+        self.container = container
+        self.messages  = []
+        self.executor  = "medea-test.%s.executor" % self.token
+    def statusUpdate(self, driver, update):
+        super(type(self), self).statusUpdate(driver, update)
+        if self.all_tasks_done():
+            sid = update.slave_id
+            eid = mesos_pb2.ExecutorID()
+            eid.value = self.executor
+            driver.sendFrameworkMessage(eid, sid, type(self).shutdown_message)
+            self.sum_up()
+            driver.stop()
+    def frameworkMessage(self, driver, eid, sid, msg):
+        self.messages += [msg]
+        driver.killTask(update.task_id)
+    def resourceOffers(self, driver, offers):
+        for offer in offers:
+            if len(self.tasks) >= self.trials: break
+            tid  = self.next_task_id()
+            task = task_with_executor(tid, offer.slave_id, self.executor,
+                                      self.command, self.uris, self.container)
+            self.tasks += [task]
+            self.loggers[tid].info(present_task(task))
+            driver.launchTasks(offer.id, [task])
+
+class ExecutorSchedulerExecutor(mesos.Executor):
+    def launchTask(self, driver, task):
+        def run():
+            log.info("Running task %s" % task.task_id.value)
+            update = mesos_pb2.TaskStatus()
+            update.task_id.value = task.task_id.value
+            update.state = mesos_pb2.TASK_RUNNING
+            driver.sendStatusUpdate(update)
+            log.info("Sent: TASK_RUNNING")
+            update = mesos_pb2.TaskStatus()
+            update.task_id.value = task.task_id.value
+            update.state = mesos_pb2.TASK_FINISHED
+            update.data = "ping"
+            driver.sendStatusUpdate(update)
+            log.info("Sent: TASK_FINISHED")
+        thread = threading.Thread(target=run)
+        thread.start()
+    def frameworkMessage(self, driver, message):
+        if message == ExecutorScheduler.shutdown_message:
+            log.warning("Received shutdown message: %s", message)
+            driver.stop()
+        else:
+            log.warning("Unexpected message: %s", message)
+
 
 ################################################################ Task factories
 
-def task_with_executor(tid, sid, *args):
+def task_with_executor(tid, sid, eid, *args):
     executor = mesos_pb2.ExecutorInfo()
-    executor.executor_id.value = tid
-    executor.name = tid
-    executor.source = "medea-test"
+    executor.executor_id.value = eid
+    executor.name = eid
     executor.command.MergeFrom(command(*args))
     task = task_base(tid, sid)
     task.executor.MergeFrom(executor)
@@ -206,24 +237,38 @@ def present_status(update):
 ########################################################################## Main
 
 def cli():
-    schedulers = { "sleep" : SleepScheduler,
-                   "pg"    : PGScheduler }
+    schedulers = { "sleep"    : SleepScheduler,
+                   "pg"       : PGScheduler,
+                   "executor" : ExecutorScheduler }
     p = argparse.ArgumentParser(prog="medea-test.py")
     p.add_argument("--master", default="localhost:5050",
                    help="Mesos master URL")
     p.add_argument("--test", choices=schedulers.keys(), default="sleep",
-                   help="Test suite to use")
+                   help="Test scheduler to use")
+    p.add_argument("--executor", action="store_true", default=False,
+                   help="Runs the executor instead of a test scheduler")
     p.add_argument("--test.container",
                    help="Image URL to use (for any test)")
-    p.add_argument("--test.sleep", type=int,
-                   help="Seconds to sleep (for sleep test)")
-    p.add_argument("--test.trials", type=int,
-                   help="Number of tasks to run (for any test)")
-    p.add_argument("--test.command",
-                   help="Command to use (for executor test)")
     p.add_argument("--test.uris", action="append",
                    help="Pass any number of times to add URIs (for any test)")
+    p.add_argument("--test.trials", type=int,
+                   help="Number of tasks to run (for any test)")
+    p.add_argument("--test.sleep", type=int,
+                   help="Seconds to sleep (for sleep test)")
+    p.add_argument("--test.command",
+                   help="Command to use (for executor test)")
     parsed = p.parse_args()
+
+    if parsed.executor:
+        log.info("Mesos executor mode was chosen")
+        driver = mesos.MesosExecutorDriver(ExecutorSchedulerExecutor())
+        code = driver.run()
+        log.info(mesos_pb2.Status.Name(code))
+        driver.stop()
+        if code != mesos_pb2.DRIVER_STOPPED:
+            log.error("Driver died in an anomalous state")
+            os._exit(2)
+        os._exit(0)
 
     pairs = [ (k.split("test.")[1:], v) for k, v in vars(parsed).items() ]
     constructor_args = dict( (k[0], v) for k, v in pairs if len(k) == 1 and v )

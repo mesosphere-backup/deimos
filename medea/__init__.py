@@ -14,12 +14,13 @@ import time
 try:    import mesos_pb2 as protos                 # Prefer system installation
 except: import medea.mesos_pb2 as protos
 
-import medea.docker
+import medea.cmd
 import medea.cgroups
+import medea.config
+import medea.docker
 from medea.err import *
 import medea.logger
 from medea.logger import log
-import medea.cmd
 
 
 ####################################################### Containerizer interface
@@ -200,7 +201,7 @@ def place_uris(task, directory):
     cmd(["mkdir", "-p", directory])
     for item in uris(task):
         uri = item.value
-        log.info("Retrieving URI: %r", uri)
+        log.info("Retrieving URI: %s", medea.cmd.escape([uri]))
         try:
             basename = uri.split("/")[-1]
             f = os.path.join(directory, basename)
@@ -271,10 +272,7 @@ def cli(argv=None):
         print >>sys.stderr, "** Please specify a subcommand **".center(79)
         return 1
 
-    if sys.stdout.isatty():
-        medea.logger.initialize()
-    else:
-        medea.logger.initialize(console=False, syslog=True, level=logging.INFO)
+    _, _, containers = medea.config.load_configuration()
 
     try:
         result = f(*argv[2:])
@@ -289,8 +287,11 @@ def cli(argv=None):
     except Err as e:
         log.error(str(e))
         return 4
+    except subprocess.CalledProcessError as e:
+        log.error(str(e))
+        return 4
     except Exception:
-        log.error("Failure in subcommand:", exc_info=True)
+        log.exception("Unhandled failure in %s", sub)
         return 8
     return 0
 

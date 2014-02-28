@@ -29,19 +29,19 @@ def run(options, image, command=[], env={}, cpus=None, mems=None, ports=[]):
     return argv
 
 def stop(ident):
-    return ["docker", "stop", "-t=2", ident]
+    return docker("stop", "-t=2", ident)
 
 def rm(ident):
-    return ["docker", "rm", ident]
+    return docker("rm", ident)
 
 def wait(ident):
-    return ["docker", "wait", ident]
+    return docker("wait", ident)
 
 
 images = {} ######################################## Cache of image information
 
 def pull(image):
-    Run(data=True)(["docker", "pull", image])
+    Run(data=True)(docker("pull", image))
     refresh_docker_image_info(image)
 
 def pull_once(image):
@@ -57,11 +57,11 @@ def image_info(image):
 def refresh_docker_image_info(image):
     runner  = Run(data=True)
     delim   = re.compile("  +")
-    text    = runner(["docker", "images", image])
+    text    = runner(docker("images", image))
     records = [ delim.split(line) for line in text.splitlines() ]
     for record in records:
         if record[0] == image:
-            text   = runner(["docker", "inspect", image])
+            text   = runner(docker("inspect", image))
             parsed = json.loads(text)[0]
             images[image] = parsed
             return parsed
@@ -105,12 +105,12 @@ def cgroups(ident):
     return dict( (s.split("/")[-2], s) for s in paths )
 
 def canonical_id(ident):
-    argv = ["docker", "inspect", "--format={{.ID}}", ident]
+    argv = docker("inspect", "--format={{.ID}}", ident)
     return Run(data=True)(argv).strip()
 
 def exists(ident, quiet=False):
     try:
-        argv = ["docker", "inspect", "--format={{.ID}}", ident]
+        argv = docker("inspect", "--format={{.ID}}", ident)
         level = logging.DEBUG if quiet else logging.WARNING
         with open("/dev/null", "w") as dev_null:
             Run(error_level=level)(argv, stdout=dev_null, stderr=dev_null)
@@ -130,3 +130,12 @@ def await(ident, t=0.05, n=10, terminal=False):
 
 class AwaitTimeout(Err):
     pass
+
+
+############################################################### Global settings
+
+options = []
+
+def docker(*args):
+    return ["docker"] + options + list(args)
+

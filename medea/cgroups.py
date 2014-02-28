@@ -1,24 +1,16 @@
 import logging
 
 from medea.logger import log
+from medea._struct import _Struct
 
 
-class _OpenHolder(object):
-    def __init__(self, **properties):
-        self.__dict__.update(properties)
-        self._properties = properties.keys()
-    def __repr__(self):
-        return "%s(%r)" % (self.__class__, self.__dict__)
-    def keys(self):
-        return self._properties
-
-class CGroups(_OpenHolder):
+class CGroups(_Struct):
     "Holder for a container's cgroups hierarchy."
     def __init__(self, **cgroups_path_mapping):
         properties = {}
         for k, v in cgroups_path_mapping.items():
             properties[k] = construct(v, k)
-        _OpenHolder.__init__(self, **properties)
+        _Struct.__init__(self, **properties)
         log.debug(" ".join(self.keys()))
 
 class CGroup(object):
@@ -71,7 +63,7 @@ class CPUAcct(CGroup):
         "Total system time for container in seconds."
         return float(self.stat_data().system) / 100
 
-class StatFile(_OpenHolder):
+class StatFile(_Struct):
     def __init__(self, data):
         kvs = [ line.strip().split(" ") for line in data.strip().split("\n") ]
         res = {}
@@ -79,5 +71,5 @@ class StatFile(_OpenHolder):
             if len(kvs) != 2: continue  # Silently skip lines that aren't pairs
             k, v = kvs
             res[k] = v
-        _OpenHolder.__init__(self, **res)
+        _Struct.__init__(self, **res)
 

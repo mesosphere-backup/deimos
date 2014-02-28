@@ -14,7 +14,7 @@ USAGE
 export LC_ALL=en_US.UTF-8                    # A locale that works consistently
 
 function main {
-  preamble >&2
+  [[ ! ${PTYHONPATH+isset} ]] || preamble >&2
   short "$@"
 }
 
@@ -43,32 +43,65 @@ function long {
 
 function harness {
   local timeout="$1" ; shift
-  msg "**** Test suite will timeout in $timeout seconds"
   ( cd "$this" && "$@" ) &
   local worker_process=$!
   trap "killtree $worker_process" TERM INT
+  local token=/tmp/"$(printf medea-test-suite.%04x.%04x $RANDOM $RANDOM)"
   ( trap 'exit 0' TERM
     sleep "$timeout"
+    touch "$token"
     killtree "$worker_process" ) &>/dev/null &
   local term_process=$!
-  trap "killtree $worker_process || true ; killtree $term_process" TERM INT
-  wait "$worker_process" && local code=$? || local code=$?
+  trap "killtree $worker_process $term_process || true ; rm -f $token" TERM INT
+  if wait "$worker_process"
+  then
+    msg "**** SUCCESS"
+  else
+    local code=$?
+    [[ -e "$token" ]] && msg "**** TIMEOUT (${timeout}s)" || msg "**** FAILURE"
+  fi
   killtree "$term_process" || true
-  [[ $code = 0 ]] && msg "**** SUCCESS" || msg "**** FAILURE"
-  return "$code"
+  rm -f "$token"
+  return "${code:-0}"
+}
+
+function test_ {
+   local master="$1" test="$2" ; shift 2
+  ./medea-test.py --master "$master" --test "$test" "$@"
+}
+
+function test_sleep {
+  test_ "$1" sleep    --test.trials "${3:-4}" --test.sleep "${2:-2}"
+}
+
+function test_executor {
+  test_ "$1" executor --test.trials "${2:-2}"
+}
+
+function test_pg {
+  test_ "$1" pg       --test.trials "${2:-2}"
 }
 
 function short_tests {
-  ./medea-test.py --master "$1" --test sleep --test.sleep  2 --test.trials  4
-  ./medea-test.py --master "$1" --test pg                    --test.trials  5
+  test_sleep    "$1"
+  test_pg       "$1"
+  test_executor "$1"
 }
 
 function long_tests {
-  short_tests
-  ./medea-test.py --master "$1" --test sleep --test.sleep 10 --test.trials 10
+  short_tests   "$1"
+  test_sleep    "$1" 10 10
+  test_executor "$1" 5
 }
 
 function killtree {
+  if [[ $# -gt 1 ]]
+  then
+    for arg in "$@"
+    do killtree "$arg" || true
+    done
+    return 0
+  fi
   kill -STOP "$1" &>/dev/null
   ps -e -o pid= -o ppid= | while read -r pid ppid
                            do
