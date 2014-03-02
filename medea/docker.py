@@ -21,12 +21,12 @@ def run(options, image, command=[], env={}, cpus=None, mems=None, ports=[]):
         for allocated, target in port_pairings:
             if allocated is None or target is None: break
             options += [ "-p", "%d:%d" % (allocated, target) ]
-    argv  = [ "docker", "run" ] + options
+    argv  = [ "run" ] + options
     argv += [ "-c", str(cpus) ] if cpus else []
     argv += [ "-m", str(mems) ] if mems else []
     argv += [ _ for __ in pairs for _ in __ ]            # This is just flatten
     argv += [ image ] + command
-    return argv
+    return docker(*argv)
 
 def stop(ident):
     return docker("stop", "-t=2", ident)

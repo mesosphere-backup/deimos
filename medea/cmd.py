@@ -23,7 +23,7 @@ class Run(object):
         try:
             self.log.log(self.start_level, present(argv))
             argv_ = in_sh(argv, not self.data) if self.in_sh else argv
-            result = runner(argv_, *args, **opts) 
+            result = runner(argv_, *args, **opts)
             self.log.log(self.success_level, present(argv, 0))
             return result
         except subprocess.CalledProcessError as e:

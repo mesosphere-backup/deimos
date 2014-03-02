@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 
+import medea.argv
 import medea.docker
 from medea.logger import log
 import medea.logger
@@ -31,15 +32,17 @@ def load_configuration(f=None, interactive=sys.stdout.isatty()):
     return logconf, docker, containers
 
 def coercearray(array):
-    if array[0:1] != "[":
-        return [array]
-    try:
-        arr = json.loads(array)
-        if type(arr) is not list:
-            raise ValueError() 
-        return arr
-    except:
-        raise ValueError("Not an array: %s" % array)
+    if type(array) in medea.argv.strings:
+        if array[0:1] != "[":
+            return [array]
+        try:
+            arr = json.loads(array)
+            if type(arr) is not list:
+                raise ValueError()
+            return arr
+        except:
+            raise ValueError("Not an array: %s" % array)
+    return list(array)
 
 def coerceloglevel(level):
     if not level:
@@ -63,24 +66,38 @@ def coercebool(b):
     try:
         bl = json.loads(b)
         if type(bl) is not bool:
-            raise ValueError() 
+            raise ValueError()
         return bl
     except:
         raise ValueError("Not a bool: %s" % b)
+
+def coerceoption(val):
+    try:
+        return coercearray(val)
+    except:
+        return coercebool(val)
+
+
 class Image(_Struct):
     def __init__(self, default=None, ignore=False):
         _Struct.__init__(self, default=default, ignore=coercebool(ignore))
-
+    def override(self, image=None):
+        return image if (image and not self.ignore) else self.default
 
 class Options(_Struct):
     def __init__(self, default=[], append=[], ignore=False):
         _Struct.__init__(self, default=coercearray(default),
                                append=coercearray(append),
                                ignore=coercebool(ignore))
+    def override(self, options=[]):
+        a = options if (len(options) > 0 and not self.ignore) else self.default
+        return a + self.append
 
 class Containers(_Struct):
     def __init__(self, image=Image(), options=Options()):
         _Struct.__init__(self, image=image, options=options)
+    def override(self, image=None, options=[]):
+        return self.image.override(image), self.options.override(options)
 
 class Log(_Struct):
     def __init__(self, console=None, syslog=None):
@@ -90,10 +107,10 @@ class Log(_Struct):
 class Docker(_Struct):
     def __init__(self, **properties):
         for k in properties.keys():
-            properties[k] = coercearray(properties[k])
+            properties[k] = coerceoption(properties[k])
         _Struct.__init__(self, **properties)
     def argv(self):
-        return [ [("--" + k, v) for v in arr] for k, arr in self.items() ]
+        return medea.argv.argv(**dict(self.items()))
 
 
 def parse(f):
