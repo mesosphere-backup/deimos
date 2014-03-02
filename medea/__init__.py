@@ -22,9 +22,10 @@ def cli(argv=None):
         print >>sys.stderr, "** Please specify a subcommand **".center(79)
         return 1
 
-    _, docker, containers = medea.config.load_configuration()
-    containerizer = medea.containerizer.Docker(container_settings=containers)
+    _, docker, containers, uris = medea.config.load_configuration()
     medea.docker.options = docker.argv()
+    containerizer = medea.containerizer.Docker(container_settings=containers,
+                                               optimistic_unpack=uris.unpack)
 
     try:
         result = containerizer(*argv[1:])

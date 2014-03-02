@@ -12,14 +12,14 @@ from medea._struct import _Struct
 
 
 def load_configuration(f=None, interactive=sys.stdout.isatty()):
-    logconf, docker, containers = Log(), Docker(), Containers()
+    logconf, docker, containers, uris = Log(), Docker(), Containers(), URIs()
     error = None
     logconf.console = logging.DEBUG if interactive     else None
     logconf.syslog  = logging.INFO  if not interactive else None
     try:
         f = f if f else path()
         if f:
-            logconf, docker, containers = parse(f)
+            logconf, docker, containers, uris = parse(f)
     except Exception as e:
         error = e
     finally:
@@ -29,7 +29,7 @@ def load_configuration(f=None, interactive=sys.stdout.isatty()):
             sys.exit(16)
         if f:
             log.info("Loaded configuration from %s" % f)
-    return logconf, docker, containers
+    return logconf, docker, containers, uris
 
 def coercearray(array):
     if type(array) in medea.argv.strings:
@@ -99,6 +99,10 @@ class Containers(_Struct):
     def override(self, image=None, options=[]):
         return self.image.override(image), self.options.override(options)
 
+class URIs(_Struct):
+    def __init__(self, unpack=False):
+        _Struct.__init__(self, unpack=coercebool(unpack))
+
 class Log(_Struct):
     def __init__(self, console=None, syslog=None):
         _Struct.__init__(self, console=coerceloglevel(console),
@@ -129,10 +133,14 @@ def parse(f):
     except NoSectionError:
         options = Options()
     try:
+        uris = URIs(**dict(config.items("uris")))
+    except NoSectionError:
+        uris = URIs()
+    try:
         docker = Docker(**dict(config.items("docker")))
     except NoSectionError:
         docker = Docker()
-    return (log, docker, Containers(image, options))
+    return (log, docker, Containers(image, options), uris)
 
 def path():
     for p in search_path:

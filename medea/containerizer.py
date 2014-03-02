@@ -53,10 +53,12 @@ class Docker(Containerizer, _Struct):
     def __init__(self, workdir="/tmp/mesos-sandbox",
                        softlink_root="/tmp",
                        shared_dir="fs",
+                       optimistic_unpack=True,
                        container_settings=medea.config.Containers()):
         _Struct.__init__(self, workdir=workdir,
                                softlink_root=softlink_root,
                                shared_dir=shared_dir,
+                               optimistic_unpack=optimistic_unpack,
                                config=container_settings,
                                cmd=medea.cmd.Run())
     def launch(self, container_id, *args):
@@ -75,7 +77,7 @@ class Docker(Containerizer, _Struct):
         docker_name = container_id_as_docker_name(container_id)
         run_options = ["--name", docker_name]
 
-        place_uris(task, self.shared_dir)
+        place_uris(task, self.shared_dir, self.optimistic_unpack)
         run_options += ["-w", self.workdir]
 
         # Docker requires an absolute path to a source filesystem, separated
@@ -233,11 +235,12 @@ def mesos_directory():
         log.info("Changing directory to MESOS_DIRECTORY=%s", task_dir)
         os.chdir(task_dir)
 
-def place_uris(task, directory):
+def place_uris(task, directory, optimistic_unpack=False):
     cmd = medea.cmd.Run()
     cmd(["mkdir", "-p", directory])
     for item in uris(task):
         uri = item.value
+        gen_unpack_cmd = unpacker(uri) if optimistic_unpack else None
         log.info("Retrieving URI: %s", medea.cmd.escape([uri]))
         try:
             basename = uri.split("/")[-1]
@@ -255,6 +258,14 @@ def place_uris(task, directory):
             continue
         if item.executable:
             os.chmod(f, 0755)
+        if gen_unpack_cmd:
+            cmd(gen_unpack_cmd(f, directory))
+
+def unpacker(uri):
+    if re.match(r"[.](t|tar[.])(bz2|xz|gz)$", uri):
+        return lambda f, directory: ["tar", "-C", directory, "-xf", f]
+    if re.match(r"[.]zip$", uri):
+        return lambda f, directory: ["unzip", "-d", directory, f]
 
 
 ####################################################### IO & system interaction
