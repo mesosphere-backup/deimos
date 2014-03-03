@@ -2,7 +2,7 @@
 
 from setuptools import setup
 
-setup(name                   =  "medea",
+setup(name                   =  "deimos",
       license                =  "Apache",
       version                =  "0.0.0",
       install_requires       =  ["protobuf"],
@@ -11,9 +11,9 @@ setup(name                   =  "medea",
       author_email           =  "jason.dusek@gmail.com",
       maintainer             =  "Mesosphere",
       maintainer_email       =  "support@mesosphere.io",
-      url                    =  "https://github.com/mesosphere/medea",
-      packages               =  ["medea"],
-      entry_points           =  { "console_scripts": ["medea = medea:cli"] },
+      url                    =  "https://github.com/mesosphere/deimos",
+      packages               =  ["deimos"],
+      entry_points           =  { "console_scripts": ["deimos = deimos:cli"] },
       classifiers            =  [ "Environment :: Console",
                                   "Intended Audience :: Developers",
                                   "Operating System :: Unix",

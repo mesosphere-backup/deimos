@@ -4,11 +4,11 @@ import logging
 import os
 import sys
 
-import medea.argv
-import medea.docker
-from medea.logger import log
-import medea.logger
-from medea._struct import _Struct
+import deimos.argv
+import deimos.docker
+from deimos.logger import log
+import deimos.logger
+from deimos._struct import _Struct
 
 
 def load_configuration(f=None, interactive=sys.stdout.isatty()):
@@ -23,7 +23,7 @@ def load_configuration(f=None, interactive=sys.stdout.isatty()):
     except Exception as e:
         error = e
     finally:
-        medea.logger.initialize(**dict(logconf.items(onlyset=True)))
+        deimos.logger.initialize(**dict(logconf.items(onlyset=True)))
         if error:
             log.exception((("Error loading %s: " % f) if f else "")+str(error))
             sys.exit(16)
@@ -32,7 +32,7 @@ def load_configuration(f=None, interactive=sys.stdout.isatty()):
     return logconf, docker, containers, uris
 
 def coercearray(array):
-    if type(array) in medea.argv.strings:
+    if type(array) in deimos.argv.strings:
         if array[0:1] != "[":
             return [array]
         try:
@@ -114,7 +114,7 @@ class Docker(_Struct):
             properties[k] = coerceoption(properties[k])
         _Struct.__init__(self, **properties)
     def argv(self):
-        return medea.argv.argv(**dict(self.items()))
+        return deimos.argv.argv(**dict(self.items()))
 
 
 def parse(f):
@@ -147,9 +147,9 @@ def path():
         if os.path.exists(p):
             return p
 
-search_path = ["./medea.cfg",
-               os.path.expanduser("~/.medea"),
-               "/etc/medea.cfg",
-               "/usr/etc/medea.cfg",
-               "/usr/local/etc/medea.cfg"]
+search_path = ["./deimos.cfg",
+               os.path.expanduser("~/.deimos"),
+               "/etc/deimos.cfg",
+               "/usr/etc/deimos.cfg",
+               "/usr/local/etc/deimos.cfg"]
 

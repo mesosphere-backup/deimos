@@ -1,7 +1,7 @@
 import logging
 
-from medea.logger import log
-from medea._struct import _Struct
+from deimos.logger import log
+from deimos._struct import _Struct
 
 
 class CGroups(_Struct):

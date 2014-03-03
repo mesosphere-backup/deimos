@@ -46,7 +46,7 @@ function harness {
   ( cd "$this" && "$@" ) &
   local worker_process=$!
   trap "killtree $worker_process" TERM INT
-  local token=/tmp/"$(printf medea-test-suite.%04x.%04x $RANDOM $RANDOM)"
+  local token=/tmp/"$(printf deimos-test-suite.%04x.%04x $RANDOM $RANDOM)"
   ( trap 'exit 0' TERM
     sleep "$timeout"
     touch "$token"
@@ -67,7 +67,7 @@ function harness {
 
 function test_ {
    local master="$1" test="$2" ; shift 2
-  ./medea-test.py --master "$master" --test "$test" "$@"
+  ./deimos-test.py --master "$master" --test "$test" "$@"
 }
 
 function test_sleep {

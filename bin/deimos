@@ -1,3 +1,3 @@
 bin="`dirname "$0"`" && dir="`dirname "$bin"`" &&
-exec python -m medea.__init__ "$@"
+exec python -m deimos.__init__ "$@"
 # A convenience for development. Not installed or used in production.

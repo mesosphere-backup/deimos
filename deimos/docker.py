@@ -7,9 +7,9 @@ import subprocess
 import sys
 import time
 
-from medea.cmd import Run
-from medea.err import *
-from medea.logger import log
+from deimos.cmd import Run
+from deimos.err import *
+from deimos.logger import log
 
 
 def run(options, image, command=[], env={}, cpus=None, mems=None, ports=[]):

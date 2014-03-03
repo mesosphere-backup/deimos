@@ -52,7 +52,7 @@ class Scheduler(mesos.Scheduler):
                  for code, count in counts.items() ]
     def next_task_id(self):
         short_id = "%s.task-%02d" % (self.token, len(self.tasks))
-        long_id  = "medea-test." + short_id
+        long_id  = "deimos-test." + short_id
         self.loggers[long_id] = log.getChild(short_id)
         return long_id
     terminal = set([ mesos_pb2.TASK_FINISHED,
@@ -114,7 +114,7 @@ class PGScheduler(Scheduler):
             driver.launchTasks(offer.id, [task])
 
 class ExecutorScheduler(Scheduler):
-    sh = "python medea-test.py --executor"
+    sh = "python deimos-test.py --executor"
     this = "file://" + os.path.abspath(__file__)
     libmesos = "docker:///mesosphere/libmesos"
     shutdown_message = "shutdown"
@@ -124,7 +124,7 @@ class ExecutorScheduler(Scheduler):
         self.uris      = uris
         self.container = container
         self.messages  = []
-        self.executor  = "medea-test.%s.executor" % self.token
+        self.executor  = "deimos-test.%s.executor" % self.token
     def statusUpdate(self, driver, update):
         super(type(self), self).statusUpdate(driver, update)
         if self.all_tasks_done():
@@ -240,7 +240,7 @@ def cli():
     schedulers = { "sleep"    : SleepScheduler,
                    "pg"       : PGScheduler,
                    "executor" : ExecutorScheduler }
-    p = argparse.ArgumentParser(prog="medea-test.py")
+    p = argparse.ArgumentParser(prog="deimos-test.py")
     p.add_argument("--master", default="localhost:5050",
                    help="Mesos master URL")
     p.add_argument("--test", choices=schedulers.keys(), default="sleep",
@@ -278,7 +278,7 @@ def cli():
     log.info("Testing: %s(%s)" % (scheduler_class.__name__, args))
 
     framework = mesos_pb2.FrameworkInfo()
-    framework.name = "medea-test"
+    framework.name = "deimos-test"
     framework.user = ""
     driver = mesos.MesosSchedulerDriver(scheduler, framework, parsed.master)
     code = driver.run()
@@ -298,7 +298,7 @@ def cli():
 
 logging.basicConfig(format="%(asctime)s.%(msecs)03d %(name)s %(message)s",
                     datefmt="%H:%M:%S", level=logging.DEBUG)
-log = logging.getLogger("medea-test")
+log = logging.getLogger("deimos-test")
 
 if __name__ == "__main__":
     def handler(signum, _):

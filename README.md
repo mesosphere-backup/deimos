@@ -1,5 +1,5 @@
-medea
-=====
+deimos
+======
 
 Mesos containerizer hooks for Docker
 
@@ -17,22 +17,22 @@ Options to `docker run` are passed as part of the `CommandInfo` structure.
     }
 
 Some options for Docker, like `-H`, do not apply only to `docker run`. These
-can be set in the Medea configuration file.
+can be set in the Deimos configuration file.
 
-Medea recognizes Mesos resources that specify ports, CPUs and memory and
+Deimos recognizes Mesos resources that specify ports, CPUs and memory and
 translates them in to Docker options.
 
 
 Logging
 -------
 
-Medea logs to the console when run interactively and to syslog when run in the
-background. You can configure logging explicitly in the Medea configuration
+Deimos logs to the console when run interactively and to syslog when run in the
+background. You can configure logging explicitly in the Deimos configuration
 file.
 
 
-Medea Configuration File
-------------------------
+Deimos Configuration File
+-------------------------
 
 There is an example configuration file in `example.cfg` which documents all
 the configuration options. The two config sections that are likely to be most
@@ -44,10 +44,10 @@ important in production are:
 
 Configuration files are searched in this order:
 
-    ./medea.cfg
-    ~/.medea
-    /etc/medea.cfg
-    /usr/etc/medea.cfg
-    /usr/local/etc/medea.cfg
+    ./deimos.cfg
+    ~/.deimos
+    /etc/deimos.cfg
+    /usr/etc/deimos.cfg
+    /usr/local/etc/deimos.cfg
 
-Only *one* of these files is used -- the first one found.
+Only *one* of these files is loaded -- the first one found.

@@ -4,7 +4,7 @@ import logging.handlers
 import os
 
 
-root = logging.getLogger("medea")
+root = logging.getLogger("deimos")
 
 class log(): # Really just a namespace
     @staticmethod
@@ -37,7 +37,7 @@ def initialize(console=logging.DEBUG, syslog=logging.INFO):
         root.addHandler(stderr)
     if syslog:
         dev = "/dev/log" if os.path.exists("/dev/log") else "/var/run/syslog"
-        fmt = "medea[%(process)d]: %(name)s %(message)s"
+        fmt = "deimos[%(process)d]: %(name)s %(message)s"
         logger = logging.handlers.SysLogHandler(address=dev)
         logger.setFormatter(logging.Formatter(fmt=fmt))
         logger.setLevel(syslog)

@@ -3,8 +3,8 @@ import pipes
 import subprocess
 import sys
 
-import medea.logger
-from medea.err import *
+import deimos.logger
+from deimos.err import *
 
 
 class Run(object):
@@ -12,7 +12,7 @@ class Run(object):
                        start_level=logging.DEBUG,
                        success_level=logging.DEBUG,
                        error_level=logging.WARNING):
-        self.log   = log if log else medea.logger.logger(2)
+        self.log   = log if log else deimos.logger.logger(2)
         self.data  = data
         self.in_sh = in_sh
         self.start_level   = start_level

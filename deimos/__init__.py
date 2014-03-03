@@ -3,10 +3,10 @@ from __future__ import absolute_import
 import subprocess
 import sys
 
-import medea.config
-import medea.containerizer
-from medea.err import Err
-from medea.logger import log
+import deimos.config
+import deimos.containerizer
+from deimos.err import Err
+from deimos.logger import log
 
 
 def cli(argv=None):
@@ -17,15 +17,15 @@ def cli(argv=None):
         print format_help()
         return 0
 
-    if sub not in medea.containerizer.methods():
+    if sub not in deimos.containerizer.methods():
         print >>sys.stderr, format_help()
         print >>sys.stderr, "** Please specify a subcommand **".center(79)
         return 1
 
-    _, docker, containers, uris = medea.config.load_configuration()
-    medea.docker.options = docker.argv()
-    containerizer = medea.containerizer.Docker(container_settings=containers,
-                                               optimistic_unpack=uris.unpack)
+    _, docker, containers, uris = deimos.config.load_configuration()
+    deimos.docker.options = docker.argv()
+    containerizer = deimos.containerizer.Docker(container_settings=containers,
+                                                optimistic_unpack=uris.unpack)
 
     try:
         result = containerizer(*argv[1:])
@@ -50,11 +50,11 @@ def cli(argv=None):
 
 def format_help():
     return """
- USAGE: medea launch  <container-id> (--mesos-executor /a/path)? < taskInfo.pb
-        medea usage   <container-id>
-        medea destroy <container-id>
+ USAGE: deimos launch  <container-id> (--mesos-executor /a/path)? < taskInfo.pb
+        deimos usage   <container-id>
+        deimos destroy <container-id>
 
-  Medea provides Mesos integration for Docker, allowing Docker to be used as
+  Deimos provides Mesos integration for Docker, allowing Docker to be used as
   an external containerizer.
 
   In the first form, launches a container based on the TaskInfo passed on

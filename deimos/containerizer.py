@@ -10,17 +10,17 @@ import sys
 import time
 
 try:    import mesos_pb2 as protos                 # Prefer system installation
-except: import medea.mesos_pb2 as protos
+except: import deimos.mesos_pb2 as protos
 
-import medea.cgroups
-import medea.cmd
-import medea.config
-import medea.containerizer
-import medea.docker
-from medea.err import Err
-import medea.logger
-from medea.logger import log
-from medea._struct import _Struct
+import deimos.cgroups
+import deimos.cmd
+import deimos.config
+import deimos.containerizer
+import deimos.docker
+from deimos.err import Err
+import deimos.logger
+from deimos.logger import log
+from deimos._struct import _Struct
 
 
 class Containerizer(object):
@@ -54,13 +54,13 @@ class Docker(Containerizer, _Struct):
                        softlink_root="/tmp",
                        shared_dir="fs",
                        optimistic_unpack=True,
-                       container_settings=medea.config.Containers()):
+                       container_settings=deimos.config.Containers()):
         _Struct.__init__(self, workdir=workdir,
                                softlink_root=softlink_root,
                                shared_dir=shared_dir,
                                optimistic_unpack=optimistic_unpack,
                                config=container_settings,
-                               cmd=medea.cmd.Run())
+                               cmd=deimos.cmd.Run())
     def launch(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         install_signal_handler(self.destroy, [container_id],
@@ -104,15 +104,15 @@ class Docker(Containerizer, _Struct):
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
             runner_argv = []
 
-        runner_argv += medea.docker.run(run_options, image, argv(task),
+        runner_argv += deimos.docker.run(run_options, image, argv(task),
                                         env=env, ports=ports(task),
                                         cpus=cpus, mems=mems)
 
         with open("stdout", "w") as o:        # This awkward double 'with' is a
             with open("stderr", "w") as e:    # concession to 2.6 compatibility
-                call = medea.cmd.in_sh(runner_argv, allstderr=False)
+                call = deimos.cmd.in_sh(runner_argv, allstderr=False)
                 try:
-                    log.info(medea.cmd.present(runner_argv))
+                    log.info(deimos.cmd.present(runner_argv))
                     runner = subprocess.Popen(call, stdout=o, stderr=e)
                     time.sleep(0.1)
                 finally:
@@ -125,8 +125,8 @@ class Docker(Containerizer, _Struct):
     def usage(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         name = container_id_as_docker_name(container_id)
-        medea.docker.await(name)
-        cg = medea.cgroups.CGroups(**medea.docker.cgroups(name))
+        deimos.docker.await(name)
+        cg = deimos.cgroups.CGroups(**deimos.docker.cgroups(name))
         if len(cg.keys()) == 0:
             raise Err("No CGroups found: %s" % container_id)
         try:
@@ -144,8 +144,8 @@ class Docker(Containerizer, _Struct):
     def destroy(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         name = container_id_as_docker_name(container_id)
-        medea.docker.await(name)
-        for argv in [medea.docker.stop(name), medea.docker.rm(name)]:
+        deimos.docker.await(name)
+        for argv in [deimos.docker.stop(name), deimos.docker.rm(name)]:
             try:
                 self.cmd(argv)
             except subprocess.CalledProcessError as e:
@@ -158,7 +158,7 @@ class Docker(Containerizer, _Struct):
             proto_out(protos.PluggableStatus, message="destroy/docker: ok")
         return 0
     def sandbox_softlink(self, docker_name, setup=False):
-        link = os.path.join(self.softlink_root, "medea-fs." + docker_name)
+        link = os.path.join(self.softlink_root, "deimos-fs." + docker_name)
         if setup:
             source = os.path.abspath(self.shared_dir)
             self.cmd(["ln", "-s", source, link])
@@ -236,12 +236,12 @@ def mesos_directory():
         os.chdir(task_dir)
 
 def place_uris(task, directory, optimistic_unpack=False):
-    cmd = medea.cmd.Run()
+    cmd = deimos.cmd.Run()
     cmd(["mkdir", "-p", directory])
     for item in uris(task):
         uri = item.value
         gen_unpack_cmd = unpacker(uri) if optimistic_unpack else None
-        log.info("Retrieving URI: %s", medea.cmd.escape([uri]))
+        log.info("Retrieving URI: %s", deimos.cmd.escape([uri]))
         try:
             basename = uri.split("/")[-1]
             f = os.path.join(directory, basename)
@@ -254,7 +254,7 @@ def place_uris(task, directory, optimistic_unpack=False):
             cmd(["curl", "-sSfL", uri, "--output", f])
         except subprocess.CalledProcessError as e:
             log.warning("Failed while processing URI: %s",
-                        medea.cmd.escape(uri))
+                        deimos.cmd.escape(uri))
             continue
         if item.executable:
             os.chmod(f, 0755)
