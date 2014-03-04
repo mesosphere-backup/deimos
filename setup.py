@@ -1,10 +1,16 @@
 #!/usr/bin/env python
 
 from setuptools import setup
+import subprocess
+
+def git_tag():
+    code = """ ( git describe --tags 2>/dev/null || echo 0.0.0 ) |
+               cut -d- -f1,2 | tr - . """
+    return subprocess.check_output(code, shell=True).strip()
 
 setup(name                   =  "deimos",
       license                =  "Apache",
-      version                =  "0.0.0",
+      version                =  git_tag(),
       install_requires       =  ["protobuf"],
       description            =  "Mesos containerization hooks for Docker",
       author                 =  "Jason Dusek",
