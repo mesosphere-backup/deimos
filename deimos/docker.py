@@ -104,6 +104,12 @@ def cgroups(ident):
     paths = glob.glob("/sys/fs/cgroup/*/" + canonical_id(ident))
     return dict( (s.split("/")[-2], s) for s in paths )
 
+def matching_image_for_host():
+    return Run(data=True)(["bash", "-c", """
+        [[ ! -s /etc/os-release ]] ||
+        ( source /etc/os-release && tr A-Z a-z <<<"$ID":"$VERSION_ID" )
+    """]).strip()
+
 def canonical_id(ident):
     argv = docker("inspect", "--format={{.ID}}", ident)
     return Run(data=True)(argv).strip()

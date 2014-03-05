@@ -28,10 +28,10 @@ class Run(object):
             return result
         except subprocess.CalledProcessError as e:
             self.log.log(self.error_level, present(argv, e.returncode))
-            raise Err("External command failure")
+            raise e
 
 def present(argv, exit=None):
-    if exit:
+    if exit is not None:
         return "exit %d // %s" % (exit, escape(argv))
     else:
         return "call // %s" % escape(argv)

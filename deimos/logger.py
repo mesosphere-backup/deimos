@@ -28,7 +28,7 @@ def initialize(console=logging.DEBUG, syslog=logging.INFO):
     if _initialized: return
     _settings = locals()
     _initialized = True
-    root.setLevel(min(console, syslog))
+    root.setLevel(min( level for level in [console, syslog] if level ))
     if console:
         stderr = logging.StreamHandler()
         fmt = "%(asctime)s.%(msecs)03d %(name)s %(message)s"

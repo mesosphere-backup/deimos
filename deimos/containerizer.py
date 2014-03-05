@@ -13,7 +13,7 @@ try:    import mesos_pb2 as protos                 # Prefer system installation
 except: import deimos.mesos_pb2 as protos
 
 import deimos.cgroups
-import deimos.cmd
+from deimos.cmd import Run
 import deimos.config
 import deimos.containerizer
 import deimos.docker
@@ -59,8 +59,7 @@ class Docker(Containerizer, _Struct):
                                softlink_root=softlink_root,
                                shared_dir=shared_dir,
                                optimistic_unpack=optimistic_unpack,
-                               config=container_settings,
-                               cmd=deimos.cmd.Run())
+                               config=container_settings)
     def launch(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         install_signal_handler(self.destroy, [container_id],
@@ -73,7 +72,7 @@ class Docker(Containerizer, _Struct):
         if pre != "":
             raise Err("URL '%s' is not a valid docker:// URL!" % url)
         if image == "":
-            image = matching_docker_for_host()
+            image = deimos.docker.matching_image_for_host()
         docker_name = container_id_as_docker_name(container_id)
         run_options = ["--name", docker_name]
 
@@ -114,9 +113,9 @@ class Docker(Containerizer, _Struct):
                 try:
                     log.info(deimos.cmd.present(runner_argv))
                     runner = subprocess.Popen(call, stdout=o, stderr=e)
-                    time.sleep(0.1)
+                    time.sleep(0.5)
                 finally:
-                    self.cmd(["rm", "-f", sandbox_softlink])
+                    Run()(["rm", "-f", sandbox_softlink])
                 proto_out(protos.PluggableStatus, message="launch/docker: ok")
                 sys.stdout.close()      # Mark STDOUT as closed for Python code
                 os.close(1)     # Use low-level call to close OS side of STDOUT
@@ -147,7 +146,7 @@ class Docker(Containerizer, _Struct):
         deimos.docker.await(name)
         for argv in [deimos.docker.stop(name), deimos.docker.rm(name)]:
             try:
-                self.cmd(argv)
+                Run()(argv)
             except subprocess.CalledProcessError as e:
                 log.error("Non-zero exit (%d): %r", e.returncode, argv)
                 return e.returncode
@@ -161,7 +160,7 @@ class Docker(Containerizer, _Struct):
         link = os.path.join(self.softlink_root, "deimos-fs." + docker_name)
         if setup:
             source = os.path.abspath(self.shared_dir)
-            self.cmd(["ln", "-s", source, link])
+            Run()(["ln", "-s", source, link])
         return link
 
 

@@ -23,7 +23,7 @@ def load_configuration(f=None, interactive=sys.stdout.isatty()):
     except Exception as e:
         error = e
     finally:
-        deimos.logger.initialize(**dict(logconf.items(onlyset=True)))
+        deimos.logger.initialize(**dict(logconf.items()))
         if error:
             log.exception((("Error loading %s: " % f) if f else "")+str(error))
             sys.exit(16)
