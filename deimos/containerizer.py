@@ -104,8 +104,8 @@ class Docker(Containerizer, _Struct):
             runner_argv = []
 
         runner_argv += deimos.docker.run(run_options, image, argv(task),
-                                        env=env, ports=ports(task),
-                                        cpus=cpus, mems=mems)
+                                         env=env, ports=ports(task),
+                                         cpus=cpus, mems=mems)
 
         with open("stdout", "w") as o:        # This awkward double 'with' is a
             with open("stderr", "w") as e:    # concession to 2.6 compatibility

@@ -125,7 +125,7 @@ def exists(ident, quiet=False):
         return False
     return True
 
-def await(ident, t=0.05, n=10, terminal=False):
+def await(ident, t=0.05, n=10):
     for _ in range(0, n):
         if exists(ident, quiet=True): break
         time.sleep(t)
