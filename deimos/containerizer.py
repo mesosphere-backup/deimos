@@ -109,17 +109,21 @@ class Docker(Containerizer, _Struct):
 
         with open("stdout", "w") as o:        # This awkward double 'with' is a
             with open("stderr", "w") as e:    # concession to 2.6 compatibility
-                call = deimos.cmd.in_sh(runner_argv, allstderr=False)
-                try:
-                    log.info(deimos.cmd.present(runner_argv))
-                    runner = subprocess.Popen(call, stdout=o, stderr=e)
-                    time.sleep(0.5)
-                finally:
-                    Run()(["rm", "-f", sandbox_softlink])
-                proto_out(protos.PluggableStatus, message="launch/docker: ok")
-                sys.stdout.close()      # Mark STDOUT as closed for Python code
-                os.close(1)     # Use low-level call to close OS side of STDOUT
-                runner_code = runner.wait()
+                with open(os.devnull) as devnull:
+                    call = deimos.cmd.in_sh(runner_argv, allstderr=False)
+                    try:
+                        log.info(deimos.cmd.present(runner_argv))
+                        runner = subprocess.Popen(call, stdin=devnull,
+                                                        stdout=o,
+                                                        stderr=e)
+                        time.sleep(0.5)
+                    finally:
+                        Run()(["rm", "-f", sandbox_softlink])
+                    proto_out(protos.PluggableStatus,
+                              message="launch/docker: ok")
+                    sys.stdout.close()  # Mark STDOUT as closed for Python code
+                    os.close(1) # Use low-level call to close OS side of STDOUT
+                    runner_code = runner.wait()
         return runner_code
     def usage(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))

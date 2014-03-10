@@ -1,29 +1,37 @@
 import logging
+import os
 import pipes
 import subprocess
 import sys
 
 import deimos.logger
 from deimos.err import *
+from deimos._struct import _Struct
 
 
-class Run(object):
-    def __init__(self, log=None, data=False, in_sh=True,
+class Run(_Struct):
+    def __init__(self, log=None, data=False, in_sh=True, close_stdin=True,
                        start_level=logging.DEBUG,
                        success_level=logging.DEBUG,
                        error_level=logging.WARNING):
-        self.log   = log if log else deimos.logger.logger(2)
-        self.data  = data
-        self.in_sh = in_sh
-        self.start_level   = start_level
-        self.success_level = success_level
-        self.error_level   = error_level
+        _Struct.__init__(self, log   = log if log else deimos.logger.logger(2),
+                               data  = data,
+                               in_sh = in_sh,
+                               close_stdin   = close_stdin,
+                               start_level   = start_level,
+                               success_level = success_level,
+                               error_level   = error_level)
     def __call__(self, argv, *args, **opts):
         runner = subprocess.check_output if self.data else subprocess.check_call
         try:
             self.log.log(self.start_level, present(argv))
-            argv_ = in_sh(argv, not self.data) if self.in_sh else argv
-            result = runner(argv_, *args, **opts)
+            argv_  = in_sh(argv, not self.data) if self.in_sh else argv
+            if self.close_stdin and "stdin" not in opts:
+                with open(os.devnull) as devnull:
+                    opts["stdin"] = devnull
+                    result = runner(argv_, *args, **opts)
+            else:
+                result = runner(argv_, *args, **opts)
             self.log.log(self.success_level, present(argv, 0))
             return result
         except subprocess.CalledProcessError as e:
