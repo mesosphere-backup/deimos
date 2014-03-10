@@ -97,15 +97,18 @@ class PGScheduler(Scheduler):
     def statusUpdate(self, driver, update):
         super(type(self), self).statusUpdate(driver, update)
         if update.state == mesos_pb2.TASK_RUNNING:
-            time.sleep(2)
-            driver.killTask(update.task_id)       # Shutdown Postgres container
+            def end_task():
+                time.sleep(2)
+                driver.killTask(update.task_id)
+            thread = threading.Thread(target=end_task)
+            thread.daemon = True
+            thread.start()
         if self.all_tasks_done():
             self.sum_up()
             driver.stop()
     def resourceOffers(self, driver, offers):
         for offer in offers:
             if len(self.tasks) >= self.trials: break
-            time.sleep(2)
             tid  = self.next_task_id()
             sid  = offer.slave_id
             task = task_with_daemon(tid, sid, self.container)
@@ -163,6 +166,7 @@ class ExecutorSchedulerExecutor(mesos.Executor):
             driver.sendStatusUpdate(update)
             log.info("Sent: TASK_FINISHED")
         thread = threading.Thread(target=run)
+        thread.daemon = True
         thread.start()
     def frameworkMessage(self, driver, message):
         if message == ExecutorScheduler.shutdown_message:
