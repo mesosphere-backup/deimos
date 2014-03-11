@@ -130,10 +130,9 @@ class Docker(Containerizer, _Struct):
                     if observer_argv is not None:
                         log.info(deimos.cmd.present(observer_argv))
                         call = deimos.cmd.in_sh(observer_argv)
-                        observer = subprocess.Popen(call, stdin=devnull)
-#                       observer = subprocess.Popen(call, stdin=devnull,
-#                                                         stdout=devnull,
-#                                                         stderr=devnull)
+                        observer = subprocess.Popen(call, stdin=devnull,
+                                                          stdout=devnull,
+                                                          stderr=devnull)
                     runner_code = runner.wait()
                     if observer is not None:
                         c = observer.wait()
