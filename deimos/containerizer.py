@@ -20,6 +20,7 @@ import deimos.docker
 from deimos.err import Err
 import deimos.logger
 from deimos.logger import log
+import deimos.path
 from deimos._struct import _Struct
 
 
@@ -74,7 +75,8 @@ class Docker(Containerizer, _Struct):
         if image == "":
             image = deimos.docker.matching_image_for_host()
         docker_name = container_id_as_docker_name(container_id)
-        run_options = ["--name", docker_name]
+        run_options  = ["--name", docker_name]
+        run_options += ["--rm"]
 
         place_uris(task, self.shared_dir, self.optimistic_unpack)
         run_options += ["-w", self.workdir]
@@ -95,18 +97,20 @@ class Docker(Containerizer, _Struct):
         # if no executor is passed as part of the task. We need to pass the
         # MESOS_* environment variables in to the container if we're going to
         # start an executor.
+        observer_argv = None
         if needs_executor_wrapper(task):
             if not(len(args) > 1 and args[0] == "--mesos-executor"):
                 raise Err("This task needs --mesos-executor to be set!")
-            runner_argv = [args[1]]
+            observer_argv = [ args[1], deimos.path.me(),
+                              "wait", docker_name, "--docker" ]
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
-            runner_argv = []
 
-        runner_argv += deimos.docker.run(run_options, image, argv(task),
-                                         env=env, ports=ports(task),
-                                         cpus=cpus, mems=mems)
+        runner_argv = deimos.docker.run(run_options, image, argv(task),
+                                        env=env, ports=ports(task),
+                                        cpus=cpus, mems=mems)
 
+        observer = None
         with open("stdout", "w") as o:        # This awkward double 'with' is a
             with open("stderr", "w") as e:    # concession to 2.6 compatibility
                 with open(os.devnull) as devnull:
@@ -116,14 +120,25 @@ class Docker(Containerizer, _Struct):
                         runner = subprocess.Popen(call, stdin=devnull,
                                                         stdout=o,
                                                         stderr=e)
-                        time.sleep(0.5)
+                        deimos.docker.await(docker_name, n=1000)
                     finally:
                         Run()(["rm", "-f", sandbox_softlink])
                     proto_out(protos.PluggableStatus,
                               message="launch/docker: ok")
                     sys.stdout.close()  # Mark STDOUT as closed for Python code
                     os.close(1) # Use low-level call to close OS side of STDOUT
+                    if observer_argv is not None:
+                        log.info(deimos.cmd.present(observer_argv))
+                        call = deimos.cmd.in_sh(observer_argv)
+                        observer = subprocess.Popen(call, stdin=devnull)
+#                       observer = subprocess.Popen(call, stdin=devnull,
+#                                                         stdout=devnull,
+#                                                         stderr=devnull)
                     runner_code = runner.wait()
+                    if observer is not None:
+                        c = observer.wait()
+                        if c != 0:
+                            log.warning(deimos.cmd.present(observer_argv, c))
         return runner_code
     def usage(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
@@ -144,6 +159,21 @@ class Docker(Containerizer, _Struct):
             log.error("Missing CGroup!")
             raise e
         return 0
+    def wait(self, container_id, *args):
+        if args[0:1] != ["--docker"]:
+            return      # We rely on the Mesos default wait strategy in general
+        # In Docker mode, we use Docker wait to wait for the container and
+        # then exit with the returned exit code.
+        name = container_id # In --docker mode, it's already a docker-safe name
+        deimos.docker.await(name)
+        data = Run(data=True)(deimos.docker.wait(name))
+        try:
+            code = int(data)
+            code = 127 + abs(code) if code < 0 else code
+            return code % 256
+        except:
+            log.error("Result of `docker wait` was not an int: %r" % data)
+            return 111
     def destroy(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         name = container_id_as_docker_name(container_id)
