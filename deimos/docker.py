@@ -2,6 +2,7 @@ import glob
 import itertools
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -10,6 +11,7 @@ import time
 from deimos.cmd import Run
 from deimos.err import *
 from deimos.logger import log
+from deimos._struct import _Struct
 
 
 def run(options, image, command=[], env={}, cpus=None, mems=None, ports=[]):
@@ -88,6 +90,10 @@ def inner_ports(image):
 
 ################################################# System and process interfaces
 
+class Status(_Struct):
+    def __init__(self, cid=None, pid=None, exit=None):
+        _Struct.__init__(self, cid=cid, pid=pid, exit=exit)
+
 def root_pid(ident):
     """Lookup the root PID for the given container.
     This is the PID that corresponds the `lxc-start` command at the root of
@@ -110,26 +116,36 @@ def matching_image_for_host():
         ( source /etc/os-release && tr A-Z a-z <<<"$ID":"$VERSION_ID" )
     """]).strip()
 
+def probe(ident, quiet=False):
+    fields = "{{.ID}} {{.State.Pid}} {{.State.ExitCode}}"
+    level  = logging.DEBUG if quiet else logging.WARNING
+    argv   = docker("inspect", "--format=" + fields, ident)
+    with open(os.devnull, "w") as devnull:
+        run  = Run(data=True, error_level=level)
+        text = run(argv, stderr=devnull).strip()
+        cid, pid, exit = text.split()
+        return Status(cid=cid, pid=pid, exit=(exit if pid == 0 else None))
+
 def canonical_id(ident):
-    argv = docker("inspect", "--format={{.ID}}", ident)
-    return Run(data=True)(argv).strip()
+    return probe(ident).cid
 
 def exists(ident, quiet=False):
     try:
-        argv = docker("inspect", "--format={{.ID}}", ident)
-        level = logging.DEBUG if quiet else logging.WARNING
-        with open("/dev/null", "w") as dev_null:
-            Run(error_level=level)(argv, stdout=dev_null, stderr=dev_null)
+        return probe(ident, quiet)
     except subprocess.CalledProcessError as e:
-        if e.returncode != 1: raise e
-        return False
-    return True
+        if e.returncode != 1:
+            raise e
+        return None
 
 def await(ident, t=0.05, n=10):
     for _ in range(0, n):
-        if exists(ident, quiet=True): break
+        result = exists(ident, quiet=True)
+        if result:
+            return result
         time.sleep(t)
-    if exists(ident): return
+    result = exists(ident, quiet=True)
+    if result:
+        return result
     msg = "Container %s not ready after %d sleeps of %g seconds"
     log.warning(msg % (ident, n, t))
     raise AwaitTimeout("Timed out waiting for %s" % ident)

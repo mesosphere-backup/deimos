@@ -142,7 +142,9 @@ class Docker(Containerizer, _Struct):
     def usage(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         name = container_id_as_docker_name(container_id)
-        deimos.docker.await(name)
+        status = deimos.docker.await(name)
+        if status.exit is not None:
+            raise Err("The container %s has already exited" % container_id)
         cg = deimos.cgroups.CGroups(**deimos.docker.cgroups(name))
         if len(cg.keys()) == 0:
             raise Err("No CGroups found: %s" % container_id)
@@ -176,13 +178,12 @@ class Docker(Containerizer, _Struct):
     def destroy(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         name = container_id_as_docker_name(container_id)
-        deimos.docker.await(name)
-        for argv in [deimos.docker.stop(name), deimos.docker.rm(name)]:
-            try:
-                Run()(argv)
-            except subprocess.CalledProcessError as e:
-                log.error("Non-zero exit (%d): %r", e.returncode, argv)
-                return e.returncode
+        status = deimos.docker.await(name)
+        if status.exit is None:
+            Run()(deimos.docker.stop(name))
+            Run()(deimos.docker.rm(name))
+        else:
+            log.warning("Container %s is already stopped", container_id)
         if not sys.stdout.closed:
             # If we're called as part of the signal handler set up by launch,
             # STDOUT is probably closed already. Writing the Protobuf would
