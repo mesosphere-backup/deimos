@@ -120,7 +120,7 @@ class Docker(Containerizer, _Struct):
                         runner = subprocess.Popen(call, stdin=devnull,
                                                         stdout=o,
                                                         stderr=e)
-                        deimos.docker.await(docker_name, n=1000)
+                        self.await(docker_name, n=1000)
                     finally:
                         Run()(["rm", "-f", sandbox_softlink])
                     proto_out(protos.PluggableStatus,
@@ -142,7 +142,7 @@ class Docker(Containerizer, _Struct):
     def usage(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         name = container_id_as_docker_name(container_id)
-        status = deimos.docker.await(name)
+        status = self.await(name)
         if status.exit is not None:
             raise Err("The container %s has already exited" % container_id)
         cg = deimos.cgroups.CGroups(**deimos.docker.cgroups(name))
@@ -166,7 +166,7 @@ class Docker(Containerizer, _Struct):
         # In Docker mode, we use Docker wait to wait for the container and
         # then exit with the returned exit code.
         name = container_id # In --docker mode, it's already a docker-safe name
-        deimos.docker.await(name)
+        self.await(name)
         data = Run(data=True)(deimos.docker.wait(name))
         try:
             code = int(data)
@@ -178,7 +178,7 @@ class Docker(Containerizer, _Struct):
     def destroy(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         name = container_id_as_docker_name(container_id)
-        status = deimos.docker.await(name)
+        status = self.await(name)
         if status.exit is None:
             Run()(deimos.docker.stop(name))
             Run()(deimos.docker.rm(name))
@@ -196,6 +196,8 @@ class Docker(Containerizer, _Struct):
             source = os.path.abspath(self.shared_dir)
             Run()(["ln", "-s", source, link])
         return link
+    def await(self, *args, **kwargs):
+        return deimos.docker.await(*args, **kwargs)
 
 
 ####################################################### Mesos interface helpers

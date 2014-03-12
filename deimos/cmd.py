@@ -10,7 +10,8 @@ from deimos._struct import _Struct
 
 
 class Run(_Struct):
-    def __init__(self, log=None, data=False, in_sh=True, close_stdin=True,
+    def __init__(self, log=None, data=False, in_sh=True,
+                       close_stdin=True, log_stderr=True,
                        start_level=logging.DEBUG,
                        success_level=logging.DEBUG,
                        error_level=logging.WARNING):
@@ -18,25 +19,36 @@ class Run(_Struct):
                                data  = data,
                                in_sh = in_sh,
                                close_stdin   = close_stdin,
+                               log_stderr    = log_stderr,
                                start_level   = start_level,
                                success_level = success_level,
                                error_level   = error_level)
     def __call__(self, argv, *args, **opts):
-        runner = subprocess.check_output if self.data else subprocess.check_call
+        out, err = None, None
+        if "stdout" not in opts:
+            opts["stdout"] = subprocess.PIPE if self.data else None
+        if "stderr" not in opts:
+            opts["stderr"] = subprocess.PIPE if self.log_stderr else None
         try:
             self.log.log(self.start_level, present(argv))
             argv_  = in_sh(argv, not self.data) if self.in_sh else argv
-            if self.close_stdin and "stdin" not in opts:
-                with open(os.devnull) as devnull:
+            with open(os.devnull) as devnull:
+                if self.close_stdin and "stdin" not in opts:
                     opts["stdin"] = devnull
-                    result = runner(argv_, *args, **opts)
-            else:
-                result = runner(argv_, *args, **opts)
-            self.log.log(self.success_level, present(argv, 0))
-            return result
+                p = subprocess.Popen(argv_, *args, **opts)
+                out, err = p.communicate()
+                code = p.wait()
+            if code == 0:
+                self.log.log(self.success_level, present(argv, 0))
+                if out is not None:
+                    self.log.log(self.success_level, "STDOUT // " + out)
+                return out
         except subprocess.CalledProcessError as e:
-            self.log.log(self.error_level, present(argv, e.returncode))
-            raise e
+            code = e.returncode
+        self.log.log(self.error_level, present(argv, code))
+        if err is not None:
+            self.log.log(self.error_level, "STDERR // " + err)
+        raise subprocess.CalledProcessError(code, argv)
 
 def present(argv, exit=None):
     if exit is not None:
@@ -59,19 +71,4 @@ def in_sh(argv, allstderr=True):
     #     matters.
     call = 'exec "$@" >&2' if allstderr else 'exec "$@"'
     return ["/bin/sh", "-c", call, "sh"] + argv
-
-# This try block is here to upgrade functionality available the subprocess
-# module for older versions of Python. As last as 2.6, subprocess did not have
-# the check_output function.
-try:
-    subprocess.check_output
-except:
-    def check_output(*args):
-        p = subprocess.Popen(stdout=subprocess.PIPE, *args)
-        stdout = p.communicate()[0]
-        exitcode = p.wait()
-        if exitcode:
-            raise subprocess.CalledProcessError(exitcode, args[0])
-        return stdout
-    subprocess.check_output = check_output
 

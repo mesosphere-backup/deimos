@@ -38,7 +38,7 @@ def cli(argv=None):
                 for item in result:
                     sys.stdout.write(str(item) + "\n")
     except Err as e:
-        log.error(str(e))
+        log.error("%s: %s", e.__class__.__name__, str(e))
         return 4
     except subprocess.CalledProcessError as e:
         log.error(str(e))

@@ -120,11 +120,10 @@ def probe(ident, quiet=False):
     fields = "{{.ID}} {{.State.Pid}} {{.State.ExitCode}}"
     level  = logging.DEBUG if quiet else logging.WARNING
     argv   = docker("inspect", "--format=" + fields, ident)
-    with open(os.devnull, "w") as devnull:
-        run  = Run(data=True, error_level=level)
-        text = run(argv, stderr=devnull).strip()
-        cid, pid, exit = text.split()
-        return Status(cid=cid, pid=pid, exit=(exit if pid == 0 else None))
+    run    = Run(data=True, error_level=level)
+    text   = run(argv).strip()
+    cid, pid, exit = text.split()
+    return Status(cid=cid, pid=pid, exit=(exit if pid == 0 else None))
 
 def canonical_id(ident):
     return probe(ident).cid
