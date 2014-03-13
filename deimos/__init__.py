@@ -17,15 +17,19 @@ def cli(argv=None):
         print format_help()
         return 0
 
+    conf = deimos.config.load_configuration()
+
     if sub not in deimos.containerizer.methods():
         print >>sys.stderr, format_help()
         print >>sys.stderr, "** Please specify a subcommand **".center(79)
         return 1
 
-    _, docker, containers, uris = deimos.config.load_configuration()
-    deimos.docker.options = docker.argv()
-    containerizer = deimos.containerizer.Docker(container_settings=containers,
-                                                optimistic_unpack=uris.unpack)
+    deimos.docker.options = conf.docker.argv()
+    containerizer = deimos.containerizer.Docker(
+        container_settings=conf.containers,
+        optimistic_unpack=conf.uris.unpack
+    #   state=conf.state.tmp
+    )
 
     try:
         result = containerizer(*argv[1:])

@@ -12,24 +12,35 @@ from deimos._struct import _Struct
 
 
 def load_configuration(f=None, interactive=sys.stdout.isatty()):
-    logconf, docker, containers, uris = Log(), Docker(), Containers(), URIs()
     error = None
-    logconf.console = logging.DEBUG if interactive     else None
-    logconf.syslog  = logging.INFO  if not interactive else None
+    defaults = _Struct(docker     = Docker(),
+                       containers = Containers(),
+                       uris       = URIs(),
+                       state      = FileStore(),
+                       log        = Log(
+                         console  = logging.DEBUG if interactive     else None,
+                         syslog   = logging.INFO  if not interactive else None
+                       ))
+    parsed = None
     try:
         f = f if f else path()
         if f:
-            logconf, docker, containers, uris = parse(f)
+            parsed = parse(f)
     except Exception as e:
         error = e
     finally:
-        deimos.logger.initialize(**dict(logconf.items()))
+        confs = defaults.merge(parsed) if parsed else defaults
+        deimos.logger.initialize(**dict(confs.log.items()))
         if error:
             log.exception((("Error loading %s: " % f) if f else "")+str(error))
             sys.exit(16)
-        if f:
+        if parsed:
             log.info("Loaded configuration from %s" % f)
-    return logconf, docker, containers, uris
+            for _, conf in parsed.items():
+                log.debug("Found: %r", conf)
+        else:
+            log.debug("No config file found in: %r", search_path)
+    return confs
 
 def coercearray(array):
     if type(array) in deimos.argv.strings:
@@ -116,31 +127,35 @@ class Docker(_Struct):
     def argv(self):
         return deimos.argv.argv(**dict(self.items()))
 
+class FileStore(_Struct):
+    def __init__(self, root="/tmp/deimos"):
+        if ":" in root:
+            raise ValueError("Deimos root storage path must not contain ':'")
+        _Struct.__init__(self, root=root)
+
 
 def parse(f):
     config = SafeConfigParser()
     config.read(f)
-    try:
-        log = Log(**dict(config.items("log")))
-    except NoSectionError:
-        log = Log()
-    try:
-        image = Image(**dict(config.items("containers.image")))
-    except NoSectionError:
-        image = Image()
-    try:
-        options = Options(**dict(config.items("containers.options")))
-    except NoSectionError:
-        options = Options()
-    try:
-        uris = URIs(**dict(config.items("uris")))
-    except NoSectionError:
-        uris = URIs()
-    try:
-        docker = Docker(**dict(config.items("docker")))
-    except NoSectionError:
-        docker = Docker()
-    return (log, docker, Containers(image, options), uris)
+    parsed = {}
+    sections = [("log", Log),   ("state", FileStore), ("docker", Docker),
+                ("uris", URIs), ("containers.image",   Image),
+                                ("containers.options", Options)]
+    for key, cls in sections:
+        try:
+            parsed[key] = cls(**dict(config.items(key)))
+        except:
+            continue
+    containers = {}
+    if "containers.image" in parsed:
+        containers["image"] = parsed["containers.image"]
+        del parsed["containers.image"]
+    if "containers.options" in parsed:
+        containers["options"] = parsed["containers.options"]
+        del parsed["containers.options"]
+    if len(containers) > 0:
+        parsed["containers"] = Containers(**containers)
+    return _Struct(**parsed)
 
 def path():
     for p in search_path:
