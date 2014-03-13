@@ -94,20 +94,8 @@ class Status(_Struct):
     def __init__(self, cid=None, pid=None, exit=None):
         _Struct.__init__(self, cid=cid, pid=pid, exit=exit)
 
-def root_pid(ident):
-    """Lookup the root PID for the given container.
-    This is the PID that corresponds the `lxc-start` command at the root of
-    the container's process tree.
-    """
-    fetch_lxc_pid = """ ps -C lxc-start -o pid= -o args= | # Look for lxc-start
-                        fgrep -- " -n $1" |           # Just for this container
-                        cut -d" " -f1                       # Keep only the PID
-                    """
-    argv = ["sh", "-c", fetch_lxc_pid.strip(), "sh", canonical_id(ident)]
-    return Run(data=True)(argv).strip()
-
-def cgroups(ident):
-    paths = glob.glob("/sys/fs/cgroup/*/" + canonical_id(ident))
+def cgroups(cid):
+    paths = glob.glob("/sys/fs/cgroup/*/" + cid)
     return dict( (s.split("/")[-2], s) for s in paths )
 
 def matching_image_for_host():
@@ -124,9 +112,6 @@ def probe(ident, quiet=False):
     text   = run(argv).strip()
     cid, pid, exit = text.split()
     return Status(cid=cid, pid=pid, exit=(exit if pid == 0 else None))
-
-def canonical_id(ident):
-    return probe(ident).cid
 
 def exists(ident, quiet=False):
     try:

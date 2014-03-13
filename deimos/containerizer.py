@@ -1,4 +1,5 @@
 import base64
+from fcntl import LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN
 import inspect
 import logging
 import os
@@ -22,6 +23,7 @@ import deimos.logger
 from deimos.logger import log
 import deimos.path
 from deimos._struct import _Struct
+import deimos.state
 
 
 class Containerizer(object):
@@ -52,31 +54,33 @@ def methods():
 
 class Docker(Containerizer, _Struct):
     def __init__(self, workdir="/tmp/mesos-sandbox",
-                       softlink_root="/tmp",
+                       state_root="/tmp/deimos",
                        shared_dir="fs",
                        optimistic_unpack=True,
                        container_settings=deimos.config.Containers()):
         _Struct.__init__(self, workdir=workdir,
-                               softlink_root=softlink_root,
+                               state_root=state_root,
                                shared_dir=shared_dir,
                                optimistic_unpack=optimistic_unpack,
                                config=container_settings)
     def launch(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
-        install_signal_handler(self.destroy, [container_id],
-                               signal.SIGINT, signal.SIGTERM)
+        state = deimos.state.State(self.state_root, mesos_id=container_id)
+        state.push()
+        state.lock("launch", LOCK_EX)
         mesos_directory()
         task = protos.TaskInfo()
         task.ParseFromString(sys.stdin.read())
+        state.task_id = task.task_id.value
+        state.push()
+        state.ids()
         url, options = self.config.override(*container(task))
         pre, image = url.split("docker:///")
         if pre != "":
             raise Err("URL '%s' is not a valid docker:// URL!" % url)
         if image == "":
             image = deimos.docker.matching_image_for_host()
-        docker_name = container_id_as_docker_name(container_id)
-        run_options  = ["--name", docker_name]
-        run_options += ["--rm"]
+        run_options  = ["--rm", "--cidfile", state.resolve("cid")]
 
         place_uris(task, self.shared_dir, self.optimistic_unpack)
         run_options += ["-w", self.workdir]
@@ -86,8 +90,9 @@ class Docker(Containerizer, _Struct):
         # path to the Mesos sandbox might have colons in it (TaskIDs with
         # timestamps can cause this situation). So we create a soft link to it
         # and mount that.
-        sandbox_softlink = self.sandbox_softlink(docker_name, setup=True)
-        run_options += ["-v", "%s:%s" % (sandbox_softlink, self.workdir)]
+        shared_full = os.path.abspath(self.shared_dir)
+        sandbox_symlink = state.sandbox_symlink(shared_full)
+        run_options += ["-v", "%s:%s" % (sandbox_symlink, self.workdir)]
 
         cpus, mems = cpu_and_mem(task)
         env = [(_.name, _.value) for _ in task.command.environment.variables]
@@ -97,12 +102,11 @@ class Docker(Containerizer, _Struct):
         # if no executor is passed as part of the task. We need to pass the
         # MESOS_* environment variables in to the container if we're going to
         # start an executor.
-        observer_argv = None
+        observer_argv = [ deimos.path.me(), "wait", "--docker" ]
         if needs_executor_wrapper(task):
             if not(len(args) > 1 and args[0] == "--mesos-executor"):
                 raise Err("This task needs --mesos-executor to be set!")
-            observer_argv = [ args[1], deimos.path.me(),
-                              "wait", docker_name, "--docker" ]
+            observer_argv = [ args[1] ] + observer_argv
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
@@ -115,39 +119,44 @@ class Docker(Containerizer, _Struct):
             with open("stderr", "w") as e:    # concession to 2.6 compatibility
                 with open(os.devnull) as devnull:
                     call = deimos.cmd.in_sh(runner_argv, allstderr=False)
-                    try:
-                        log.info(deimos.cmd.present(runner_argv))
-                        runner = subprocess.Popen(call, stdin=devnull,
-                                                        stdout=o,
-                                                        stderr=e)
-                        self.await(docker_name, n=1000)
-                    finally:
-                        Run()(["rm", "-f", sandbox_softlink])
+                    log.info(deimos.cmd.present(runner_argv))
+                    runner = subprocess.Popen(call, stdin=devnull,
+                                                    stdout=o,
+                                                    stderr=e)
+                    time.sleep(0.5)
+                    state.lock("launch", LOCK_UN)
+                    state.ids()
+                    state.push()
                     proto_out(protos.PluggableStatus,
                               message="launch/docker: ok")
                     sys.stdout.close()  # Mark STDOUT as closed for Python code
                     os.close(1) # Use low-level call to close OS side of STDOUT
-                    if observer_argv is not None:
-                        log.info(deimos.cmd.present(observer_argv))
-                        call = deimos.cmd.in_sh(observer_argv)
-                        observer = subprocess.Popen(call, stdin=devnull,
-                                                          stdout=devnull,
-                                                          stderr=devnull)
+                    observer_argv += [state.cid()]
+                    log.info(deimos.cmd.present(observer_argv))
+                    call = deimos.cmd.in_sh(observer_argv)
+                    observer = subprocess.Popen(call, stdin=devnull,
+                                                      stdout=devnull,
+                                                      stderr=devnull)
                     runner_code = runner.wait()
-                    if observer is not None:
-                        c = observer.wait()
-                        if c != 0:
-                            log.warning(deimos.cmd.present(observer_argv, c))
+                    c = observer.wait()
+                    if c != 0:
+                        log.warning(deimos.cmd.present(observer_argv, c))
         return runner_code
     def usage(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
-        name = container_id_as_docker_name(container_id)
-        status = self.await(name)
-        if status.exit is not None:
-            raise Err("The container %s has already exited" % container_id)
-        cg = deimos.cgroups.CGroups(**deimos.docker.cgroups(name))
+        state = deimos.state.State(self.state_root, mesos_id=container_id)
+        state.lock("launch", LOCK_SH)
+        state.ids()
+        if state.cid() is None:
+            log.info("Container not started?")
+            return 0
+        if state.exit() is not None:
+            log.info("Container is stopped")
+            return 0
+        cg = deimos.cgroups.CGroups(**deimos.docker.cgroups(state.cid()))
         if len(cg.keys()) == 0:
-            raise Err("No CGroups found: %s" % container_id)
+            log.info("Container has no CGroups...already stopped?")
+            return 0
         try:
             proto_out(protos.ResourceStatistics,
                       timestamp             = time.time(),
@@ -160,14 +169,22 @@ class Docker(Containerizer, _Struct):
             log.error("Missing CGroup!")
             raise e
         return 0
-    def wait(self, container_id, *args):
-        if args[0:1] != ["--docker"]:
+    def wait(self, *args):
+        log.info(" ".join(list(args)))
+        if list(args[0:1]) != ["--docker"]:
             return      # We rely on the Mesos default wait strategy in general
         # In Docker mode, we use Docker wait to wait for the container and
-        # then exit with the returned exit code.
-        name = container_id # In --docker mode, it's already a docker-safe name
-        self.await(name)
-        data = Run(data=True)(deimos.docker.wait(name))
+        # then exit with the returned exit code. The passed in ID should be a
+        # Docker CID, not a Mesos container ID.
+        state = deimos.state.State(self.state_root, docker_id=args[1])
+        state.lock("launch", LOCK_SH)
+        state.ids()
+        state.lock("wait", LOCK_EX)
+        if state.exit() is not None:
+            data = state.exit()
+        else:
+            data = Run(data=True)(deimos.docker.wait(state.cid()))
+            state.exit(data.strip())
         try:
             code = int(data)
             code = 127 + abs(code) if code < 0 else code
@@ -177,27 +194,21 @@ class Docker(Containerizer, _Struct):
             return 111
     def destroy(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
-        name = container_id_as_docker_name(container_id)
-        status = self.await(name)
-        if status.exit is None:
+        state = deimos.state.State(self.state_root, mesos_id=container_id)
+        state.lock("launch", LOCK_SH)
+        state.ids()
+        state.lock("destroy", LOCK_EX)
+        if state.exit() is not None:
             Run()(deimos.docker.stop(name))
             Run()(deimos.docker.rm(name))
         else:
-            log.warning("Container %s is already stopped", container_id)
+            log.info("Container is stopped")
         if not sys.stdout.closed:
             # If we're called as part of the signal handler set up by launch,
             # STDOUT is probably closed already. Writing the Protobuf would
             # only result in a bevy of error messages.
             proto_out(protos.PluggableStatus, message="destroy/docker: ok")
         return 0
-    def sandbox_softlink(self, docker_name, setup=False):
-        link = os.path.join(self.softlink_root, "deimos-fs." + docker_name)
-        if setup:
-            source = os.path.abspath(self.shared_dir)
-            Run()(["ln", "-s", source, link])
-        return link
-    def await(self, *args, **kwargs):
-        return deimos.docker.await(*args, **kwargs)
 
 
 ####################################################### Mesos interface helpers
@@ -246,14 +257,6 @@ def cpu_and_mem(task):
 
 def needs_executor_wrapper(task):
     return not task.HasField("executor")
-
-def container_id_as_docker_name(container_id):
-    if re.match(r"^[a-zA-Z0-9.-]+$", container_id):
-        return "mesos." + container_id
-    encoded = "mesos." + base64.b16encode(container_id)
-    msg = "Creating a safe Docker name for ContainerID %r -> %s"
-    log.info(msg, container_id, encoded)
-    return encoded
 
 MESOS_ESSENTIAL_ENV = [ "MESOS_SLAVE_ID",     "MESOS_SLAVE_PID",
                         "MESOS_FRAMEWORK_ID", "MESOS_EXECUTOR_ID" ]
