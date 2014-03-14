@@ -81,10 +81,10 @@ def inner_ports(image):
     if config:
         exposed = config.get("ExposedPorts", {})
         if exposed and isinstance(exposed, dict):
-            return [ int(k.split("/")[0]) for k in exposed.keys() ]
+            return sorted( int(k.split("/")[0]) for k in exposed.keys() )
         specs = config.get("PortSpecs", [])
         if specs and isinstance(specs, list):
-            return [ int(v.split(":")[-1]) for v in specs ]
+            return sorted( int(v.split(":")[-1]) for v in specs )
     return [] # If all else fails...
 
 
