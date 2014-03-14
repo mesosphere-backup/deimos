@@ -16,7 +16,7 @@ def load_configuration(f=None, interactive=sys.stdout.isatty()):
     defaults = _Struct(docker     = Docker(),
                        containers = Containers(),
                        uris       = URIs(),
-                       state      = FileStore(),
+                       state      = State(),
                        log        = Log(
                          console  = logging.DEBUG if interactive     else None,
                          syslog   = logging.INFO  if not interactive else None
@@ -127,7 +127,7 @@ class Docker(_Struct):
     def argv(self):
         return deimos.argv.argv(**dict(self.items()))
 
-class FileStore(_Struct):
+class State(_Struct):
     def __init__(self, root="/tmp/deimos"):
         if ":" in root:
             raise ValueError("Deimos root storage path must not contain ':'")
@@ -138,7 +138,7 @@ def parse(f):
     config = SafeConfigParser()
     config.read(f)
     parsed = {}
-    sections = [("log", Log),   ("state", FileStore), ("docker", Docker),
+    sections = [("log", Log),   ("state", State), ("docker", Docker),
                 ("uris", URIs), ("containers.image",   Image),
                                 ("containers.options", Options)]
     for key, cls in sections:

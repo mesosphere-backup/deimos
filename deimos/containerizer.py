@@ -24,6 +24,7 @@ from deimos.logger import log
 import deimos.path
 from deimos._struct import _Struct
 import deimos.state
+import deimos.sig
 
 
 class Containerizer(object):
@@ -62,9 +63,12 @@ class Docker(Containerizer, _Struct):
                                state_root=state_root,
                                shared_dir=shared_dir,
                                optimistic_unpack=optimistic_unpack,
-                               config=container_settings)
+                               config=container_settings,
+                               runner=None,
+                               state=None)
     def launch(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
+        deimos.sig.install(self.sig_proxy)
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.push()
         state.lock("launch", LOCK_EX)
@@ -80,7 +84,8 @@ class Docker(Containerizer, _Struct):
             raise Err("URL '%s' is not a valid docker:// URL!" % url)
         if image == "":
             image = deimos.docker.matching_image_for_host()
-        run_options  = ["--rm", "--cidfile", state.resolve("cid")]
+        run_options  = [ "--rm",      "--sig-proxy" ]
+        run_options += [ "--cidfile", state.resolve("cid") ]
 
         place_uris(task, self.shared_dir, self.optimistic_unpack)
         run_options += ["-w", self.workdir]
@@ -118,11 +123,11 @@ class Docker(Containerizer, _Struct):
         with open("stdout", "w") as o:        # This awkward double 'with' is a
             with open("stderr", "w") as e:    # concession to 2.6 compatibility
                 with open(os.devnull) as devnull:
-                    call = deimos.cmd.in_sh(runner_argv, allstderr=False)
                     log.info(deimos.cmd.present(runner_argv))
-                    runner = subprocess.Popen(call, stdin=devnull,
-                                                    stdout=o,
-                                                    stderr=e)
+                    self.runner = subprocess.Popen(runner_argv, stdin=devnull,
+                                                                stdout=o,
+                                                                stderr=e)
+                    state.pid(self.runner.pid)
                     time.sleep(0.5)
                     state.lock("launch", LOCK_UN)
                     state.ids()
@@ -137,11 +142,11 @@ class Docker(Containerizer, _Struct):
                     observer = subprocess.Popen(call, stdin=devnull,
                                                       stdout=devnull,
                                                       stderr=devnull)
-                    runner_code = runner.wait()
+                    self.runner.wait()
                     c = observer.wait()
                     if c != 0:
                         log.warning(deimos.cmd.present(observer_argv, c))
-        return runner_code
+        return state.exit()
     def usage(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         state = deimos.state.State(self.state_root, mesos_id=container_id)
@@ -177,6 +182,8 @@ class Docker(Containerizer, _Struct):
         # then exit with the returned exit code. The passed in ID should be a
         # Docker CID, not a Mesos container ID.
         state = deimos.state.State(self.state_root, docker_id=args[1])
+        self.state = state
+        deimos.sig.install(self.signal_docker_and_resume)
         state.lock("launch", LOCK_SH)
         state.ids()
         state.lock("wait", LOCK_EX)
@@ -209,6 +216,14 @@ class Docker(Containerizer, _Struct):
             # only result in a bevy of error messages.
             proto_out(protos.PluggableStatus, message="destroy/docker: ok")
         return 0
+    def sig_proxy(self, signum):
+        if self.runner != None:
+            self.runner.send_signal(signum)
+    def signal_docker_and_resume(self, signum):
+        if self.state != None:
+            sh = "sleep 0.01 ; kill %d %s" % (signum, self.state.pid())
+            p = subprocess.Popen(["sh", "-c", sh + " 2>/dev/null 1>/dev/null"])
+            return deimos.sig.Resume()
 
 
 ####################################################### Mesos interface helpers
@@ -321,11 +336,4 @@ def proto_out(cls, **properties):
     data = obj.SerializeToString()
     sys.stdout.write(data)
     sys.stdout.flush()
-
-def install_signal_handler(f, args=[], *signals):
-    def handler(signum, _):
-        log.warning("Signal: " + str(signum))
-        f(*args)
-        os._exit(-signum)
-    for _ in signals: signal.signal(_, handler)
 

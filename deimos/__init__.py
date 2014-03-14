@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from __future__ import absolute_import
+import os
+import signal
 import subprocess
 import sys
 
@@ -7,9 +8,11 @@ import deimos.config
 import deimos.containerizer
 from deimos.err import Err
 from deimos.logger import log
+import deimos.sig
 
 
 def cli(argv=None):
+    deimos.sig.install(lambda _: None)
     if argv is None: argv = sys.argv
     sub = argv[1] if len(argv) > 1 else None
 
@@ -27,8 +30,8 @@ def cli(argv=None):
     deimos.docker.options = conf.docker.argv()
     containerizer = deimos.containerizer.Docker(
         container_settings=conf.containers,
-        optimistic_unpack=conf.uris.unpack
-    #   state=conf.state.tmp
+        optimistic_unpack=conf.uris.unpack,
+        state_root=conf.state.root
     )
 
     try:
@@ -68,3 +71,4 @@ def format_help():
 
 if __name__ == "__main__":
     sys.exit(cli(sys.argv))
+

@@ -33,13 +33,18 @@ class State(_Struct):
         if value is not None:
             link(value, p)
         return p
+    def pid(self, value=None):
+        if value is not None:
+            self._writef("pid", str(value))
+        return self._readf("pid")
     def cid(self):
         if self.docker_id is None:
             self.docker_id = self._readf("cid")
         return self.docker_id
-    def lock(self, name, flags, seconds=10):
+    def lock(self, name, flags, seconds=60):
         if (flags & fcntl.LOCK_NB) != 0:
-            raise Err("State.lock() must be called with blocking flags")
+            log.error("This function must be called with blocking flags")
+            raise Err("Bad lock spec")
         p = self.resolve(os.path.join("lock", name), mkdir=True)
         handle = flock(p, flags, seconds)
         if handle is None:
@@ -48,7 +53,7 @@ class State(_Struct):
         return handle
     def exit(self, value=None):
         if value is not None:
-            self._writef("exit", value)
+            self._writef("exit", str(value))
         return self._readf("exit")
     def push(self):
         self._mkdir()
@@ -86,11 +91,11 @@ class State(_Struct):
         return p
     def ids(self):
         if self.tid() is not None:
-            log.info("task:   %s", self.tid())
+            log.info("task   = %s", self.tid())
         if self.mesos_container_id() is not None:
-            log.info("mesos:  %s", self.mesos_container_id())
+            log.info("mesos  = %s", self.mesos_container_id())
         if self.cid() is not None:
-            log.info("docker: %s", self.cid())
+            log.info("docker = %s", self.cid())
 
 def create(path):
     if not os.path.exists(path):
