@@ -1,9 +1,11 @@
-from contextlib import contextmanager
 import errno
-import fcntl
+from fcntl import LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN
+import itertools
 import os
 import signal
+import time
 
+import deimos.docker
 from deimos.err import *
 from deimos.logger import log
 from deimos._struct import _Struct
@@ -36,25 +38,55 @@ class State(_Struct):
     def pid(self, value=None):
         if value is not None:
             self._writef("pid", str(value))
-        return self._readf("pid")
-    def cid(self):
-        if self.docker_id is None:
+        data = self._readf("pid")
+        if data is not None:
+            return int(data)
+    def cid(self, refresh=False):
+        if self.docker_id is None or refresh:
             self.docker_id = self._readf("cid")
         return self.docker_id
+    def await_cid(self, seconds=60):
+        base   = 0.05
+        start  = time.time()
+        steps  = [ 1.0, 1.25, 1.6, 2.0, 2.5, 3.2, 4.0, 5.0, 6.4, 8.0 ]
+        scales = ( 10.0 ** n for n in itertools.count() )
+        scaled = ( [scale * step for step in steps] for scale in scales )
+        sleeps = itertools.chain.from_iterable(scaled)
+        log.info("Awaiting CID file: %s", self.resolve("cid"))
+        while self.cid(refresh=True) in [None, ""]:
+            time.sleep(next(sleeps))
+            if time.time() - start >= seconds:
+                raise CIDTimeout("No CID file after %ds" % seconds)
+    def await_launch(self):
+        lk_l = self.lock("launch", LOCK_SH)
+        self.ids(3)
+        if self.cid() is None:
+            lk_l.unlock()
+            self.await_cid()
+            lk_l = self.lock("launch", LOCK_SH)
+        return lk_l
     def lock(self, name, flags, seconds=60):
-        if (flags & fcntl.LOCK_NB) != 0:
-            log.error("This function must be called with blocking flags")
-            raise Err("Bad lock spec")
+        formatted = deimos.flock.format_lock_flags(flags)
+        flags, seconds = deimos.flock.nb_seconds(flags, seconds)
+        log.info("request // %s %s (%ds)", name, formatted, seconds)
         p = self.resolve(os.path.join("lock", name), mkdir=True)
-        handle = flock(p, flags, seconds)
-        if handle is None:
-            log.error("Waited %d seconds for %s", seconds, name)
-            raise FLockTimeout()
-        return handle
+        lk = deimos.flock.LK(p, flags, seconds)
+        try:
+            lk.lock()
+        except deimos.flock.Err:
+            log.error("failure // %s %s (%ds)", name, formatted, seconds)
+            raise
+        if (flags & LOCK_EX) != 0:
+            lk.handle.write(isonow() + "\n")
+        log.info("success // %s %s (%ds)", name, formatted, seconds)
+        return lk
     def exit(self, value=None):
         if value is not None:
             self._writef("exit", str(value))
-        return self._readf("exit")
+        else:
+            data = self._readf("exit")
+            if data is not None:
+                return deimos.docker.read_wait_code(data)
     def push(self):
         self._mkdir()
         properties = [("cid", self.docker_id),
@@ -63,8 +95,8 @@ class State(_Struct):
         for k, v in properties:
             if v is not None and not os.path.exists(self.resolve(k)):
                 self._writef(k, v)
-        if self.docker_id is not None:
-            docker = os.path.join(self.root, "docker", self.docker_id)
+        if self.cid() is not None:
+            docker = os.path.join(self.root, "docker", self.cid())
             link("../mesos/" + self.mesos_id, docker)
     def _mkdir(self):
         create(os.path.join(self.root, "mesos", self.mesos_id))
@@ -81,6 +113,10 @@ class State(_Struct):
         p = os.path.join(self.root, "docker", self.docker_id, path)
         p = os.path.abspath(p)
         if mkdir:
+            docker = os.path.join(self.root, "docker", self.docker_id)
+            if not os.path.exists(docker):
+                log.error("No Docker symlink (this should be impossible)")
+                raise Err("Bad Docker symlink state")
             create(os.path.dirname(p))
         return p
     def _mesos(self, path, mkdir=False):
@@ -89,13 +125,16 @@ class State(_Struct):
         if mkdir:
             create(os.path.dirname(p))
         return p
-    def ids(self):
+    def ids(self, height=2):
+        log = deimos.logger.logger(height)
         if self.tid() is not None:
             log.info("task   = %s", self.tid())
         if self.mesos_container_id() is not None:
             log.info("mesos  = %s", self.mesos_container_id())
         if self.cid() is not None:
             log.info("docker = %s", self.cid())
+
+class CIDTimeout(Err): pass
 
 def create(path):
     if not os.path.exists(path):
@@ -106,31 +145,9 @@ def link(source, target):
         create(os.path.dirname(target))
         os.symlink(source, target)
 
-
-class FLockTimeout(Err): pass
-
-# Thanks to Glenn Maynard
-# http://stackoverflow.com/questions/5255220/fcntl-flock-how-to-implement-a-timeout/5255473#5255473
-@contextmanager
-def timeout(seconds):
-    def timeout_handler(signum, frame):
-        pass
-    original_handler = signal.signal(signal.SIGALRM, timeout_handler)
-    try:
-        signal.alarm(seconds)
-        yield
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, original_handler)
-
-def flock(path, flags, seconds=10):
-    with timeout(seconds):
-        h = open(path, "w+")
-        try:
-            fcntl.flock(h, flags)
-        except IOError as e:
-            if e.errno not in [errno.EINTR, errno.EACCESS, errno.EAGAIN]:
-                raise e
-            return None
-        return h
+def isonow():
+    t   = time.time()
+    ms  = ("%0.03f" % (t % 1))[1:]
+    iso = time.strftime("%FT%T", time.gmtime(t))
+    return iso + ms + "Z"
 

@@ -38,8 +38,6 @@ def load_configuration(f=None, interactive=sys.stdout.isatty()):
             log.info("Loaded configuration from %s" % f)
             for _, conf in parsed.items():
                 log.debug("Found: %r", conf)
-        else:
-            log.debug("No config file found in: %r", search_path)
     return confs
 
 def coercearray(array):

@@ -71,7 +71,7 @@ function test_ {
 }
 
 function test_sleep {
-  test_ "$1" sleep    --test.trials "${3:-4}" --test.sleep "${2:-2}"
+  test_ "$1" sleep    --test.trials "${3:-2}" --test.sleep "${2:-2}"
 }
 
 function test_executor {

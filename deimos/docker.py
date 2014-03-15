@@ -134,6 +134,15 @@ def await(ident, t=0.05, n=10):
     log.warning(msg % (ident, n, t))
     raise AwaitTimeout("Timed out waiting for %s" % ident)
 
+def read_wait_code(data):
+    try:
+        code = int(data)
+        code = 127 + abs(code) if code < 0 else code
+        return code % 256
+    except:
+        log.error("Result of `docker wait` wasn't an int: %r", data)
+        return 111
+
 class AwaitTimeout(Err):
     pass
 

@@ -69,9 +69,10 @@ class Docker(Containerizer, _Struct):
     def launch(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         deimos.sig.install(self.sig_proxy)
+        run_options = []
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.push()
-        state.lock("launch", LOCK_EX)
+        lk_l = state.lock("launch", LOCK_EX)
         mesos_directory()
         task = protos.TaskInfo()
         task.ParseFromString(sys.stdin.read())
@@ -84,11 +85,12 @@ class Docker(Containerizer, _Struct):
             raise Err("URL '%s' is not a valid docker:// URL!" % url)
         if image == "":
             image = deimos.docker.matching_image_for_host()
-        run_options  = [ "--rm",      "--sig-proxy" ]
+        run_options += [ "--sig-proxy" ]
+        run_options += [ "--rm" ]     # This is how we ensure container cleanup
         run_options += [ "--cidfile", state.resolve("cid") ]
 
         place_uris(task, self.shared_dir, self.optimistic_unpack)
-        run_options += ["-w", self.workdir]
+        run_options += [ "-w", self.workdir ]
 
         # Docker requires an absolute path to a source filesystem, separated
         # from the bind path in the container with a colon, but the absolute
@@ -97,7 +99,7 @@ class Docker(Containerizer, _Struct):
         # and mount that.
         shared_full = os.path.abspath(self.shared_dir)
         sandbox_symlink = state.sandbox_symlink(shared_full)
-        run_options += ["-v", "%s:%s" % (sandbox_symlink, self.workdir)]
+        run_options += [ "-v", "%s:%s" % (sandbox_symlink, self.workdir) ]
 
         cpus, mems = cpu_and_mem(task)
         env = [(_.name, _.value) for _ in task.command.environment.variables]
@@ -107,11 +109,12 @@ class Docker(Containerizer, _Struct):
         # if no executor is passed as part of the task. We need to pass the
         # MESOS_* environment variables in to the container if we're going to
         # start an executor.
-        observer_argv = [ deimos.path.me(), "wait", "--docker" ]
+        observer_argv = None
         if needs_executor_wrapper(task):
-            if not(len(args) > 1 and args[0] == "--mesos-executor"):
-                raise Err("This task needs --mesos-executor to be set!")
-            observer_argv = [ args[1] ] + observer_argv
+            options = ["--mesos-executor", "--executor"]
+            if not(len(args) > 1 and args[0] in options):
+                raise Err("Task %s needs --executor to be set!" % state.tid())
+            observer_argv = [ args[1], deimos.path.me(), "wait", "--docker" ]
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
@@ -128,29 +131,35 @@ class Docker(Containerizer, _Struct):
                                                                 stdout=o,
                                                                 stderr=e)
                     state.pid(self.runner.pid)
-                    time.sleep(0.5)
-                    state.lock("launch", LOCK_UN)
-                    state.ids()
+                    state.await_cid()
                     state.push()
+                    lk_w = state.lock("wait", LOCK_EX)
+                    lk_l.unlock()
+                    state.ids()
                     proto_out(protos.PluggableStatus,
                               message="launch/docker: ok")
                     sys.stdout.close()  # Mark STDOUT as closed for Python code
                     os.close(1) # Use low-level call to close OS side of STDOUT
-                    observer_argv += [state.cid()]
-                    log.info(deimos.cmd.present(observer_argv))
-                    call = deimos.cmd.in_sh(observer_argv)
-                    observer = subprocess.Popen(call, stdin=devnull,
-                                                      stdout=devnull,
-                                                      stderr=devnull)
-                    self.runner.wait()
-                    c = observer.wait()
-                    if c != 0:
-                        log.warning(deimos.cmd.present(observer_argv, c))
+                    if observer_argv is not None:
+                        observer_argv += [state.cid()]
+                        log.info(deimos.cmd.present(observer_argv))
+                        call = deimos.cmd.in_sh(observer_argv)
+                        observer = subprocess.Popen(call, stdin=devnull,
+                                                          stdout=devnull,
+                                                          stderr=devnull,
+                                                          close_fds=True)
+        data = Run(data=True)(deimos.docker.wait(state.cid()))
+        state.exit(data)
+        lk_w.unlock()
+        for p, arr in [(self.runner, runner_argv), (observer, observer_argv)]:
+            if p is None or p.wait() == 0:
+                continue
+            log.warning(deimos.cmd.present(arr, p.wait()))
         return state.exit()
     def usage(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         state = deimos.state.State(self.state_root, mesos_id=container_id)
-        state.lock("launch", LOCK_SH)
+        state.await_launch()
         state.ids()
         if state.cid() is None:
             log.info("Container not started?")
@@ -184,30 +193,21 @@ class Docker(Containerizer, _Struct):
         state = deimos.state.State(self.state_root, docker_id=args[1])
         self.state = state
         deimos.sig.install(self.signal_docker_and_resume)
-        state.lock("launch", LOCK_SH)
-        state.ids()
-        state.lock("wait", LOCK_EX)
-        if state.exit() is not None:
-            data = state.exit()
-        else:
-            data = Run(data=True)(deimos.docker.wait(state.cid()))
-            state.exit(data.strip())
+        state.await_launch()
         try:
-            code = int(data)
-            code = 127 + abs(code) if code < 0 else code
-            return code % 256
-        except:
-            log.error("Result of `docker wait` was not an int: %r" % data)
-            return 111
+            state.lock("wait", LOCK_SH)
+        except deimos.flock.Err:                   # Allows for signal recovery
+            state.lock("wait", LOCK_SH, 1)
+        if state.exit() is not None:
+            return state.exit()
+        raise Err("Wait lock is not held nor is exit file present")
     def destroy(self, container_id, *args):
         log.info(" ".join([container_id] + list(args)))
         state = deimos.state.State(self.state_root, mesos_id=container_id)
-        state.lock("launch", LOCK_SH)
-        state.ids()
-        state.lock("destroy", LOCK_EX)
+        state.await_launch()
+        lk_d = state.lock("destroy", LOCK_EX)
         if state.exit() is not None:
-            Run()(deimos.docker.stop(name))
-            Run()(deimos.docker.rm(name))
+            Run()(deimos.docker.stop(state.cid()))
         else:
             log.info("Container is stopped")
         if not sys.stdout.closed:
@@ -217,12 +217,11 @@ class Docker(Containerizer, _Struct):
             proto_out(protos.PluggableStatus, message="destroy/docker: ok")
         return 0
     def sig_proxy(self, signum):
-        if self.runner != None:
+        if self.runner is not None:
             self.runner.send_signal(signum)
     def signal_docker_and_resume(self, signum):
-        if self.state != None:
-            sh = "sleep 0.01 ; kill %d %s" % (signum, self.state.pid())
-            p = subprocess.Popen(["sh", "-c", sh + " 2>/dev/null 1>/dev/null"])
+        if self.state is not None and self.state.pid() is not None:
+            os.kill(self.state.pid(), signum)
             return deimos.sig.Resume()
 
 
