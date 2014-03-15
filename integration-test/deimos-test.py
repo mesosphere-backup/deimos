@@ -91,14 +91,17 @@ class SleepScheduler(Scheduler):
             driver.launchTasks(offer.id, [task])
 
 class PGScheduler(Scheduler):
-    def __init__(self, container="docker:///zaiste/postgresql", trials=10):
+    def __init__(self, sleep=10,
+                       container="docker:///zaiste/postgresql",
+                       trials=10):
         Scheduler.__init__(self, trials)
         self.container = container
+        self.sleep = sleep
     def statusUpdate(self, driver, update):
         super(type(self), self).statusUpdate(driver, update)
         if update.state == mesos_pb2.TASK_RUNNING:
             def end_task():
-                time.sleep(2)
+                time.sleep(self.sleep)
                 driver.killTask(update.task_id)
             thread = threading.Thread(target=end_task)
             thread.daemon = True
