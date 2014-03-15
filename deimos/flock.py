@@ -74,9 +74,9 @@ def lock_browser(directory):
     bash = """
         set -o errexit -o nounset -o pipefail
 
-        function files_by_inode {(
-          cd "$1" && find -type f -printf '%i %p\\0\\n' | LC_ALL=C LANG=C sort
-        )}
+        function files_by_inode {
+          find "$1" -type f -printf '%i %p\\n' | LC_ALL=C LANG=C sort
+        }
 
         function locking_pids_by_inode { 
           cat /proc/locks |
@@ -87,7 +87,8 @@ def lock_browser(directory):
 
         join <(locking_pids_by_inode) <(files_by_inode "$1")
     """
-    subprocess.check_call(["bash", "-c", bash, "bash", directory])
+    subprocess.check_call([ "bash", "-c", bash, "bash",
+                            os.path.abspath(directory) ])
 
 # Thanks to Glenn Maynard
 # http://stackoverflow.com/questions/5255220/fcntl-flock-how-to-implement-a-timeout/5255473#5255473
