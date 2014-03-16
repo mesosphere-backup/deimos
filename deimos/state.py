@@ -2,6 +2,7 @@ import errno
 from fcntl import LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN
 import itertools
 import os
+import random
 import signal
 import time
 
@@ -9,6 +10,7 @@ import deimos.docker
 from deimos.err import *
 from deimos.logger import log
 from deimos._struct import _Struct
+from deimos.timestamp import iso
 
 
 class State(_Struct):
@@ -16,7 +18,8 @@ class State(_Struct):
         _Struct.__init__(self, root=os.path.abspath(root),
                                docker_id=docker_id,
                                mesos_id=mesos_id,
-                               task_id=task_id)
+                               task_id=task_id,
+                               timestamp=None)
     def resolve(self, *args, **kwargs):
         if self.mesos_id is not None:
             return self._mesos(*args, **kwargs)
@@ -45,6 +48,10 @@ class State(_Struct):
         if self.docker_id is None or refresh:
             self.docker_id = self._readf("cid")
         return self.docker_id
+    def t(self):
+        if self.timestamp is None:
+            self.timestamp = self._readf("t")
+        return self.timestamp
     def await_cid(self, seconds=60):
         base   = 0.05
         start  = time.time()
@@ -77,7 +84,7 @@ class State(_Struct):
             log.error("failure // %s %s (%ds)", name, formatted, seconds)
             raise
         if (flags & LOCK_EX) != 0:
-            lk.handle.write(isonow() + "\n")
+            lk.handle.write(iso() + "\n")
         log.info("success // %s %s (%ds)", name, formatted, seconds)
         return lk
     def exit(self, value=None):
@@ -92,14 +99,33 @@ class State(_Struct):
         properties = [("cid", self.docker_id),
                       ("mesos-container-id", self.mesos_id),
                       ("tid", self.task_id)]
+        self.set_start_time()
         for k, v in properties:
             if v is not None and not os.path.exists(self.resolve(k)):
                 self._writef(k, v)
         if self.cid() is not None:
             docker = os.path.join(self.root, "docker", self.cid())
             link("../mesos/" + self.mesos_id, docker)
+    def set_start_time(self):
+        if self.t() is not None:
+            return
+        d = os.path.abspath(os.path.join(self.root, "start-time"))
+        create(d)
+        start, t = time.time(), iso()
+        while time.time() - start <= 1.0:
+            try:
+                p = os.path.join(d, t)
+                os.symlink("../mesos/" + self.mesos_id, p)
+                self._writef("t", t)
+                self.timestamp = t
+                return
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise
+                time.sleep(random.uniform(0.005, 0.025))
+                t = iso()
     def _mkdir(self):
-        create(os.path.join(self.root, "mesos", self.mesos_id))
+        create(self._mesos())
     def _readf(self, path):
         f = self.resolve(path)
         if os.path.exists(f):
@@ -109,8 +135,11 @@ class State(_Struct):
         f = self.resolve(path)
         with open(f, "w+") as h:
             h.write(value + "\n")
-    def _docker(self, path, mkdir=False):
-        p = os.path.join(self.root, "docker", self.docker_id, path)
+    def _docker(self, path=None, mkdir=False):
+        if path is None:
+            p = os.path.join(self.root, "docker", self.docker_id)
+        else:
+            p = os.path.join(self.root, "docker", self.docker_id, path)
         p = os.path.abspath(p)
         if mkdir:
             docker = os.path.join(self.root, "docker", self.docker_id)
@@ -119,8 +148,11 @@ class State(_Struct):
                 raise Err("Bad Docker symlink state")
             create(os.path.dirname(p))
         return p
-    def _mesos(self, path, mkdir=False):
-        p = os.path.join(self.root, "mesos", self.mesos_id, path)
+    def _mesos(self, path=None, mkdir=False):
+        if path is None:
+            p = os.path.join(self.root, "mesos", self.mesos_id)
+        else:
+            p = os.path.join(self.root, "mesos", self.mesos_id, path)
         p = os.path.abspath(p)
         if mkdir:
             create(os.path.dirname(p))
@@ -145,9 +177,11 @@ def link(source, target):
         create(os.path.dirname(target))
         os.symlink(source, target)
 
-def isonow():
-    t   = time.time()
-    ms  = ("%0.03f" % (t % 1))[1:]
-    iso = time.strftime("%FT%T", time.gmtime(t))
-    return iso + ms + "Z"
+def state(directory):
+    mesos = os.path.join(directory, "mesos-container-id")
+    if os.path.exists(mesos):
+        with open(mesos) as h:
+            mesos_id = h.read().strip()
+        root = os.path.dirname(os.path.dirname(os.path.realpath(directory)))
+        return State(root=root, mesos_id=mesos_id)
 

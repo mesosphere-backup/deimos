@@ -1,9 +1,12 @@
 #!/usr/bin/env python
+import calendar
 import os
 import signal
 import subprocess
 import sys
+import time
 
+import deimos.cleanup
 import deimos.config
 import deimos.containerizer
 from deimos.err import Err
@@ -23,9 +26,30 @@ def cli(argv=None):
 
     conf = deimos.config.load_configuration()
 
+    if sub == "config":
+        log.info("Final configuration:")
+        for _, conf in conf.items():
+            print "%r" % conf
+        return 0
+
     if sub == "locks":
         deimos.flock.lock_browser(os.path.join(conf.state.root, "mesos"))
         return 0
+
+    if sub == "state":
+        cleanup = deimos.cleanup.Cleanup(conf.state.root)
+        t, rm   = time.time(), False
+        for arg in argv[2:]:
+            if arg == "--rm":
+                rm = True
+                continue
+            t = calendar.timegm(time.strptime(arg, "%Y-%m-%dT%H:%M:%SZ"))
+        if rm:
+            return cleanup.remove(t)
+        else:
+            for d in cleanup.dirs(t):
+                sys.stdout.write(d + "\n")
+            return 0
 
     if sub not in deimos.containerizer.methods():
         print >>sys.stderr, format_help()
@@ -67,6 +91,7 @@ def format_help():
         deimos destroy <container-id>
         deimos wait --docker <docker-id>
         deimos locks
+        deimos state
 
   Deimos provides Mesos integration for Docker, allowing Docker to be used as
   an external containerizer.
@@ -96,6 +121,15 @@ def format_help():
 
   List file locks taken by Deimos, associating each file with a PID, an inode,
   and a lock level. The same file may appear multiple times.
+
+ deimos state (--rm)?
+
+  List stale state directories (those with an exit file). With --rm, removes
+  stale states.
+
+ deimos config
+
+  Load and display the configuration.
 
 """.strip("\n")
 
