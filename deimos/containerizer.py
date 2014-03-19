@@ -85,6 +85,7 @@ class Docker(Containerizer, _Struct):
             raise Err("URL '%s' is not a valid docker:// URL!" % url)
         if image == "":
             image = deimos.docker.matching_image_for_host()
+        log.info("image = %s", image)
         run_options += [ "--sig-proxy" ]
         run_options += [ "--rm" ]     # This is how we ensure container cleanup
         run_options += [ "--cidfile", state.resolve("cid") ]

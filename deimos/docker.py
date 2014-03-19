@@ -57,16 +57,13 @@ def image_info(image):
         return refresh_docker_image_info(image)
 
 def refresh_docker_image_info(image):
-    runner  = Run(data=True)
-    delim   = re.compile("  +")
-    text    = runner(docker("images", image))
-    records = [ delim.split(line) for line in text.splitlines() ]
-    for record in records:
-        if record[0] == image:
-            text   = runner(docker("inspect", image))
-            parsed = json.loads(text)[0]
-            images[image] = parsed
-            return parsed
+    try:
+        text   = Run(data=True)(docker("inspect", image))
+        parsed = json.loads(text)[0]
+        images[image] = parsed
+        return parsed
+    except subprocess.CalledProcessError as e:
+        return None
 
 def ensure_image(f):
     def f_(image, *args, **kwargs):
