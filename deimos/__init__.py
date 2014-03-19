@@ -13,6 +13,7 @@ from deimos.err import Err
 import deimos.flock
 from deimos.logger import log
 import deimos.sig
+import deimos.usage
 
 
 def cli(argv=None):
@@ -63,8 +64,10 @@ def cli(argv=None):
         state_root=conf.state.root
     )
 
+    deimos.usage.report()
     try:
         result = containerizer(*argv[1:])
+        deimos.usage.report()
         if result is not None:
             if isinstance(result, int):
                 return result
