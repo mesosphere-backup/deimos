@@ -51,7 +51,7 @@ class Containerizer(object):
 def methods():
     "Names of operations provided by containerizers, as a set."
     pairs = inspect.getmembers(Containerizer, predicate=inspect.ismethod)
-    return set( k for k, _ in pairs if k[0:1] != "-" )
+    return set( k for k, _ in pairs if k[0:1] != "_" )
 
 class Docker(Containerizer, _Struct):
     def __init__(self, workdir="/tmp/mesos-sandbox",
