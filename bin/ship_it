@@ -1,0 +1,80 @@
+#!/bin/bash
+set -o errexit -o nounset -o pipefail
+function -h {
+cat <<USAGE
+ USAGE: ship_it <host>
+
+  Send Deimos to the target host.
+
+USAGE
+}; function --help { -h ;}                 # A nice way to handle -h and --help
+export LC_ALL=en_US.UTF-8                    # A locale that works consistently
+
+function main {
+  ship_it "$@"
+}
+
+function globals {
+  export LC_ALL=en_US.UTF-8                  # A locale that works consistently
+  export LANG="$LC_ALL"
+}; globals
+
+function ship_it {
+  local host="$1"
+  setup.py sdist
+  send "$host"
+  remote "$host" --sudo -- reinstall_deimos /tmp/"$(egg)"
+}
+
+function send {
+  local host="$1"
+  rsync -avz dist/"$(egg)" "$host":/tmp/
+}
+
+function egg {(
+  cd dist
+  local eggs=( deimos-*.*.*.tar.gz )
+  out "${eggs[${#eggs[@]} - 1]}"                  # Choose the last by ASCIIbet
+)}
+
+function reinstall_deimos {
+  ! pip_installed deimos || pip uninstall -y deimos
+  easy_install "$1"
+}
+
+function pip_installed {
+  pip show "$1" | fgrep -qx "Name: $1"
+}
+
+# Used like this: remote <ssh options> -- <command> <arg>*
+function remote {
+  local ssh=( -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no )
+  local shell=( bash )
+  while [[ ${1:+isset} ]]
+  do
+    case "$1" in
+      --sudo) shell=( sudo bash ) ; shift ;;
+      --)     shift ; break ;;
+      *)      ssh=( "${ssh[@]}" "$1" ) ; shift ;;
+    esac
+  done
+  serialized "$@" | ssh "${ssh[@]}" "${shell[@]}"
+}
+
+# Set up the actor on the remote end and then send it a message.
+function serialized {
+  declare -f
+  echo set -o errexit -o nounset -o pipefail
+  echo -n 'globals &&'
+  printf ' %q' "$@" ; echo
+}
+
+function msg { out "$*" >&2 ;}
+function err { local x=$? ; msg "$*" ; return $(( $x == 0 ? 1 : $x )) ;}
+function out { printf '%s\n' "$*" ;}
+
+if [[ ${1:-} ]] && declare -F | cut -d' ' -f3 | fgrep -qx -- "${1:-}"
+then "$@"
+else main "$@"
+fi
+
