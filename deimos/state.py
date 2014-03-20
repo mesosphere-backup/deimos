@@ -14,11 +14,11 @@ from deimos.timestamp import iso
 
 
 class State(_Struct):
-    def __init__(self, root, docker_id=None, mesos_id=None, task_id=None):
+    def __init__(self, root, docker_id=None, mesos_id=None, executor_id=None):
         _Struct.__init__(self, root=os.path.abspath(root),
                                docker_id=docker_id,
                                mesos_id=mesos_id,
-                               task_id=task_id,
+                               executor_id=executor_id,
                                timestamp=None)
     def resolve(self, *args, **kwargs):
         if self.mesos_id is not None:
@@ -29,10 +29,10 @@ class State(_Struct):
         if self.mesos_id is None:
             self.mesos_id = self._readf("mesos-container-id")
         return self.mesos_id
-    def tid(self):
-        if self.task_id is None:
-            self.task_id = self._readf("tid")
-        return self.task_id
+    def eid(self):
+        if self.executor_id is None:
+            self.executor_id = self._readf("eid")
+        return self.executor_id
     def sandbox_symlink(self, value=None):
         p = self.resolve("fs")
         if value is not None:
@@ -98,7 +98,7 @@ class State(_Struct):
         self._mkdir()
         properties = [("cid", self.docker_id),
                       ("mesos-container-id", self.mesos_id),
-                      ("tid", self.task_id)]
+                      ("eid", self.executor_id)]
         self.set_start_time()
         for k, v in properties:
             if v is not None and not os.path.exists(self.resolve(k)):
@@ -159,8 +159,8 @@ class State(_Struct):
         return p
     def ids(self, height=2):
         log = deimos.logger.logger(height)
-        if self.tid() is not None:
-            log.info("task   = %s", self.tid())
+        if self.eid() is not None:
+            log.info("eid    = %s", self.eid())
         if self.mesos_container_id() is not None:
             log.info("mesos  = %s", self.mesos_container_id())
         if self.cid() is not None:

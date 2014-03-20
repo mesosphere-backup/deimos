@@ -76,7 +76,7 @@ class Docker(Containerizer, _Struct):
         mesos_directory()
         task = protos.TaskInfo()
         task.ParseFromString(sys.stdin.read())
-        state.task_id = task.task_id.value
+        state.executor_id = executor_id(task)
         state.push()
         state.ids()
         url, options = self.config.override(*container(task))
@@ -85,7 +85,7 @@ class Docker(Containerizer, _Struct):
             raise Err("URL '%s' is not a valid docker:// URL!" % url)
         if image == "":
             image = deimos.docker.matching_image_for_host()
-        log.info("image = %s", image)
+        log.info("image  = %s", image)
         run_options += [ "--sig-proxy" ]
         run_options += [ "--rm" ]     # This is how we ensure container cleanup
         run_options += [ "--cidfile", state.resolve("cid") ]
@@ -252,6 +252,12 @@ def argv(task):
 
 def uris(task):
     return fetch_command(task).uris
+
+def executor_id(task):
+    if needs_executor_wrapper(task):
+        return task.task_id.value
+    else:
+        return task.executor.executor_id.value
 
 def ports(task):
     resources = [ _.ranges.range for _ in task.resources if _.name == 'ports' ]
