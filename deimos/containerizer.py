@@ -58,12 +58,14 @@ class Docker(Containerizer, _Struct):
                        state_root="/tmp/deimos",
                        shared_dir="fs",
                        optimistic_unpack=True,
-                       container_settings=deimos.config.Containers()):
+                       container_settings=deimos.config.Containers(),
+                       index_settings=deimos.config.DockerIndex()):
         _Struct.__init__(self, workdir=workdir,
                                state_root=state_root,
                                shared_dir=shared_dir,
                                optimistic_unpack=optimistic_unpack,
-                               config=container_settings,
+                               container_settings=container_settings,
+                               index_settings=index_settings,
                                runner=None,
                                state=None)
     def launch(self, container_id, *args):
@@ -79,12 +81,12 @@ class Docker(Containerizer, _Struct):
         state.executor_id = executor_id(task)
         state.push()
         state.ids()
-        url, options = self.config.override(*container(task))
+        url, options = self.container_settings.override(*container(task))
         pre, image = url.split("docker:///")
         if pre != "":
             raise Err("URL '%s' is not a valid docker:// URL!" % url)
         if image == "":
-            image = deimos.docker.matching_image_for_host()
+            image = self.default_image(task)
         log.info("image  = %s", image)
         run_options += [ "--sig-proxy" ]
         run_options += [ "--rm" ]     # This is how we ensure container cleanup
@@ -224,7 +226,13 @@ class Docker(Containerizer, _Struct):
         if self.state is not None and self.state.pid() is not None:
             os.kill(self.state.pid(), signum)
             return deimos.sig.Resume()
-
+    def default_image(self, task):
+        opts = dict(self.index_settings.items(onlyset=True))
+        if "account_libmesos" in opts:
+            if not needs_executor_wrapper(task):
+                opts["account"] = opts["account_libmesos"]
+            del opts["account_libmesos"]
+        return deimos.docker.matching_image_for_host(**opts)
 
 ####################################################### Mesos interface helpers
 
@@ -317,13 +325,15 @@ def place_uris(task, directory, optimistic_unpack=False):
             continue
         if item.executable:
             os.chmod(f, 0755)
-        if gen_unpack_cmd:
+        if gen_unpack_cmd is not None:
+            log.info("Unpacking %s" % f)
             cmd(gen_unpack_cmd(f, directory))
+            cmd(["rm", "-f", f])
 
 def unpacker(uri):
-    if re.match(r"[.](t|tar[.])(bz2|xz|gz)$", uri):
+    if re.search(r"[.](t|tar[.])(bz2|xz|gz)$", uri):
         return lambda f, directory: ["tar", "-C", directory, "-xf", f]
-    if re.match(r"[.]zip$", uri):
+    if re.search(r"[.]zip$", uri):
         return lambda f, directory: ["unzip", "-d", directory, f]
 
 

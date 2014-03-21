@@ -14,6 +14,7 @@ from deimos._struct import _Struct
 def load_configuration(f=None, interactive=sys.stdout.isatty()):
     error = None
     defaults = _Struct(docker     = Docker(),
+                       index      = DockerIndex(),
                        containers = Containers(),
                        uris       = URIs(),
                        state      = State(),
@@ -109,7 +110,7 @@ class Containers(_Struct):
         return self.image.override(image), self.options.override(options)
 
 class URIs(_Struct):
-    def __init__(self, unpack=False):
+    def __init__(self, unpack=True):
         _Struct.__init__(self, unpack=coercebool(unpack))
 
 class Log(_Struct):
@@ -125,6 +126,12 @@ class Docker(_Struct):
     def argv(self):
         return deimos.argv.argv(**dict(self.items()))
 
+class DockerIndex(_Struct):
+    def __init__(self, index=None, account_libmesos="libmesos", account=None):
+        _Struct.__init__(self, index=index,
+                               account_libmesos=account_libmesos,
+                               account=account)
+
 class State(_Struct):
     def __init__(self, root="/tmp/deimos"):
         if ":" in root:
@@ -136,9 +143,11 @@ def parse(f):
     config = SafeConfigParser()
     config.read(f)
     parsed = {}
-    sections = [("log", Log),   ("state", State), ("docker", Docker),
-                ("uris", URIs), ("containers.image",   Image),
-                                ("containers.options", Options)]
+    sections = [("log", Log), ("state", State), ("uris", URIs),
+                ("docker",             Docker),
+                ("docker.index",       DockerIndex),
+                ("containers.image",   Image),
+                ("containers.options", Options)]
     for key, cls in sections:
         try:
             parsed[key] = cls(**dict(config.items(key)))

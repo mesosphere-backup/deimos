@@ -95,11 +95,19 @@ def cgroups(cid):
     paths = glob.glob("/sys/fs/cgroup/*/" + cid)
     return dict( (s.split("/")[-2], s) for s in paths )
 
-def matching_image_for_host():
-    return Run(data=True)(["bash", "-c", """
-        [[ ! -s /etc/os-release ]] ||
-        ( source /etc/os-release && tr A-Z a-z <<<"$ID":"$VERSION_ID" )
-    """]).strip()
+def matching_image_for_host(distro=None, release=None, *args, **kwargs):
+    if distro is None or release is None:
+        # TODO: Use redhat-release, &c
+        rel_string = Run(data=True)(["bash", "-c", """
+            set -o errexit -o nounset -o pipefail
+            ( source /etc/os-release && tr A-Z a-z <<<"$ID\t$VERSION_ID" )
+        """])
+        probed_distro, probed_release = rel_string.strip().split()
+        distro, release = (distro or probed_distro, release or probed_release)
+    return image_token("%s:%s" % (distro, release), *args, **kwargs)
+
+def image_token(name, account=None, index=None):
+    return "/".join(_ for _ in [index, account, name] if _ is not None)
 
 def probe(ident, quiet=False):
     fields = "{{.ID}} {{.State.Pid}} {{.State.ExitCode}}"
