@@ -73,19 +73,20 @@ class State(_Struct):
             lk_l = self.lock("launch", LOCK_SH)
         return lk_l
     def lock(self, name, flags, seconds=60):
-        formatted = deimos.flock.format_lock_flags(flags)
+        fmt_time  = "indefinite" if seconds is None else "%ds" % seconds
+        fmt_flags = deimos.flock.format_lock_flags(flags)
         flags, seconds = deimos.flock.nb_seconds(flags, seconds)
-        log.info("request // %s %s (%ds)", name, formatted, seconds)
+        log.info("request // %s %s (%s)", name, fmt_flags, fmt_time)
         p = self.resolve(os.path.join("lock", name), mkdir=True)
         lk = deimos.flock.LK(p, flags, seconds)
         try:
             lk.lock()
         except deimos.flock.Err:
-            log.error("failure // %s %s (%ds)", name, formatted, seconds)
+            log.error("failure // %s %s (%s)", name, fmt_flags, fmt_time)
             raise
         if (flags & LOCK_EX) != 0:
             lk.handle.write(iso() + "\n")
-        log.info("success // %s %s (%ds)", name, formatted, seconds)
+        log.info("success // %s %s (%s)", name, fmt_flags, fmt_time)
         return lk
     def exit(self, value=None):
         if value is not None:

@@ -196,7 +196,7 @@ class Docker(Containerizer, _Struct):
         deimos.sig.install(self.signal_docker_and_resume)
         state.await_launch()
         try:
-            state.lock("wait", LOCK_SH)
+            state.lock("wait", LOCK_SH, seconds=None)
         except deimos.flock.Err:                   # Allows for signal recovery
             state.lock("wait", LOCK_SH, 1)
         if state.exit() is not None:

@@ -21,6 +21,12 @@ class LK(_Struct):
         else:
             return super(LK, cls).__new__(cls, path, flags, seconds)
     def __init__(self, path, flags, seconds=default_timeout):
+        """Construct a lockable file handle. Handles are recycled.
+
+        If seconds is 0, LOCK_NB will be set. If LOCK_NB is set, seconds will
+        be set to 0. If seconds is None, there will be no timeout; but flags
+        will not be adjusted in any way.
+        """
         full = os.path.abspath(path)
         flags, seconds = nb_seconds(flags, seconds)
         if full not in locks:
@@ -34,7 +40,7 @@ class LK(_Struct):
         if self.handle is None or self.handle.closed:
             self.handle = open(self.path, "w+")
             self.fd = self.handle.fileno()
-        if (self.flags & fcntl.LOCK_NB) != 0:
+        if (self.flags & fcntl.LOCK_NB) != 0 or self.seconds is None:
             try:
                 fcntl.flock(self.handle, self.flags)
             except IOError as e:
