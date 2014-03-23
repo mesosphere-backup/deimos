@@ -127,7 +127,7 @@ class Docker(Containerizer, _Struct):
                                         cpus=cpus, mems=mems)
 
         observer = None
-        with open("stdout", "w") as o:        # This awkward double 'with' is a
+        with open("stdout", "w") as o:        # This awkward multi 'with' is a
             with open("stderr", "w") as e:    # concession to 2.6 compatibility
                 with open(os.devnull) as devnull:
                     log.info(deimos.cmd.present(runner_argv))
