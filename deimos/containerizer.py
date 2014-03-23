@@ -140,8 +140,7 @@ class Docker(Containerizer, _Struct):
                     lk_w = state.lock("wait", LOCK_EX)
                     lk_l.unlock()
                     state.ids()
-                    proto_out(protos.PluggableStatus,
-                              message="launch/docker: ok")
+                    proto_out(protos.ExternalStatus, message="launch: ok")
                     sys.stdout.close()  # Mark STDOUT as closed for Python code
                     os.close(1) # Use low-level call to close OS side of STDOUT
                     if observer_argv is not None:
@@ -220,7 +219,7 @@ class Docker(Containerizer, _Struct):
             # If we're called as part of the signal handler set up by launch,
             # STDOUT is probably closed already. Writing the Protobuf would
             # only result in a bevy of error messages.
-            proto_out(protos.PluggableStatus, message="destroy/docker: ok")
+            proto_out(protos.ExternalStatus, message="destroy: ok")
         return 0
     def sig_proxy(self, signum):
         if self.runner is not None:
