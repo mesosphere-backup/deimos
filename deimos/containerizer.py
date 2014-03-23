@@ -1,4 +1,5 @@
 import base64
+import errno
 from fcntl import LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN
 import inspect
 import logging
@@ -199,7 +200,9 @@ class Docker(Containerizer, _Struct):
         state.await_launch()
         try:
             state.lock("wait", LOCK_SH, seconds=None)
-        except deimos.flock.Err:                   # Allows for signal recovery
+        except IOError as e:                       # Allows for signal recovery
+            if e.errno != errno.EINTR:
+                raise e
             state.lock("wait", LOCK_SH, 1)
         if state.exit() is not None:
             return state.exit()
