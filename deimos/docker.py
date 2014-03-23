@@ -142,7 +142,7 @@ def await(ident, t=0.05, n=10):
 def read_wait_code(data):
     try:
         code = int(data)
-        code = 127 + abs(code) if code < 0 else code
+        code = 128 + abs(code) if code < 0 else code
         return code % 256
     except:
         log.error("Result of `docker wait` wasn't an int: %r", data)
