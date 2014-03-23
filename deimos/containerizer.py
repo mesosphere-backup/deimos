@@ -126,6 +126,8 @@ class Docker(Containerizer, _Struct):
                                         env=env, ports=ports(task),
                                         cpus=cpus, mems=mems)
 
+        log_mesos_env(logging.DEBUG)
+
         observer = None
         with open("stdout", "w") as o:        # This awkward multi 'with' is a
             with open("stderr", "w") as e:    # concession to 2.6 compatibility
@@ -147,9 +149,19 @@ class Docker(Containerizer, _Struct):
                         observer_argv += [state.cid()]
                         log.info(deimos.cmd.present(observer_argv))
                         call = deimos.cmd.in_sh(observer_argv)
+                        # TODO: Collect these leaking file handles.
+                        obs_out = open(state.resolve("observer.out"), "w+")
+                        obs_err = open(state.resolve("observer.err"), "w+")
+                        # If the Mesos executor sees LIBPROCESS_PORT=0 (which
+                        # is passed by the slave) there are problems when it
+                        # attempts to bind. ("Address already in use").
+                        # Purging both LIBPROCESS_* net variables, to be safe.
+                        for v in ["LIBPROCESS_PORT", "LIBPROCESS_IP"]:
+                            if v in os.environ:
+                                del os.environ[v]
                         observer = subprocess.Popen(call, stdin=devnull,
-                                                          stdout=devnull,
-                                                          stderr=devnull,
+                                                          stdout=obs_out,
+                                                          stderr=obs_err,
                                                           close_fds=True)
         data = Run(data=True)(deimos.docker.wait(state.cid()))
         state.exit(data)
@@ -295,6 +307,11 @@ MESOS_ESSENTIAL_ENV = [ "MESOS_SLAVE_ID",     "MESOS_SLAVE_PID",
 def mesos_env():
     env = os.environ.get
     return [ (k, env(k)) for k in MESOS_ESSENTIAL_ENV if env(k) ]
+
+def log_mesos_env(level=logging.INFO):
+    for k, v in os.environ.items():
+        if k.startswith("MESOS_") or k.startswith("LIBPROCESS_"):
+            log.log(level, "%s=%s" % (k, v))
 
 def mesos_directory():
     if not "MESOS_DIRECTORY" in os.environ: return
