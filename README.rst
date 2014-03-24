@@ -134,7 +134,7 @@ The packaged version of Mesos can also load these options from files:
 
 .. _MESOS-816: https://issues.apache.org/jira/browse/MESOS-816
 
-.. _`Mesos package`: http://downloads.mesosphere.io/master/ubuntu/13.10/mesos_0.19.0-xcon1_amd64.deb
+.. _`Mesos package`: http://downloads.mesosphere.io/master/ubuntu/13.10/mesos_0.19.0-xcon2_amd64.deb
 
-.. _`Python bindings`: http://downloads.mesosphere.io/master/ubuntu/13.10/mesos_0.19.0-xcon1_amd64.egg
+.. _`Python bindings`: http://downloads.mesosphere.io/master/ubuntu/13.10/mesos_0.19.0-xcon2_amd64.egg
 
