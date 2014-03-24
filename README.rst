@@ -16,10 +16,10 @@ Deimos can be installed `from the Cheeseshop`_.
 
     pip install deimos
 
-Although Deimos not have a library dependency on a particular Mesos version,
-one does need a development version of the `Mesos package`_ (for which there
-are also `Python bindings`_), available only for very recent Ubuntu, to try
-out external containerizers.
+Although Deimos does not have a library dependency on a particular Mesos
+version, one does need a development version of the `Mesos package`_
+(for which there are also `Python bindings`_), available only for very recent
+Ubuntu, to try out external containerizers.
 
 
 ----------------------------
