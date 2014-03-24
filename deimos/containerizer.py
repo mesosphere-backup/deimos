@@ -115,10 +115,10 @@ class Docker(Containerizer, _Struct):
         # start an executor.
         observer_argv = None
         if needs_executor_wrapper(task):
-            options = ["--mesos-executor", "--executor"]
+            options = ["--mesos-executor", "--observer"]
             if not(len(args) > 1 and args[0] in options):
-                raise Err("Task %s needs --executor to be set!" % state.tid())
-            observer_argv = [ args[1], deimos.path.me(), "wait", "--docker" ]
+                raise Err("Task %s needs --observer to be set!" % state.eid())
+            observer_argv = args[1:] + [ deimos.path.me(), "wait", "--docker" ]
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
