@@ -33,7 +33,7 @@ class CGroup(object):
 
 def construct(path, name=None):
     "Selects an appropriate CGroup subclass for the given CGroup path."
-    name = name if name else path.split("/")[-2]
+    name = name if name else path.split("/")[4]
     classes = { "memory"  : Memory,
                 "cpu"     : CPU,
                 "cpuacct" : CPUAcct }
