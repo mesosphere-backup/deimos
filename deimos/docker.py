@@ -92,8 +92,10 @@ class Status(_Struct):
         _Struct.__init__(self, cid=cid, pid=pid, exit=exit)
 
 def cgroups(cid):
-    paths = glob.glob("/sys/fs/cgroup/*/" + cid)
-    return dict( (s.split("/")[-2], s) for s in paths )
+    paths = []
+    paths += glob.glob("/sys/fs/cgroup/*/" + cid)
+    paths += glob.glob("/sys/fs/cgroup/*/docker/" + cid)
+    return dict( (s.split("/")[4], s) for s in paths )
 
 def matching_image_for_host(distro=None, release=None, *args, **kwargs):
     if distro is None or release is None:
