@@ -11,6 +11,8 @@ import subprocess
 import sys
 import time
 
+import google.protobuf
+
 try:    import mesos_pb2 as protos                 # Prefer system installation
 except: import deimos.mesos_pb2 as protos
 
@@ -79,6 +81,8 @@ class Docker(Containerizer, _Struct):
         mesos_directory()
         task = protos.TaskInfo()
         task.ParseFromString(sys.stdin.read())
+        for line in proto_lines(task):
+            log.debug(line)
         state.executor_id = executor_id(task)
         state.push()
         state.ids()
@@ -372,4 +376,8 @@ def proto_out(cls, **properties):
     data = obj.SerializeToString()
     sys.stdout.write(data)
     sys.stdout.flush()
+
+def proto_lines(proto):
+    s = google.protobuf.text_format.MessageToString(proto)
+    return s.strip().split("\n")
 
