@@ -196,8 +196,8 @@ class Docker(Containerizer, _Struct):
                       timestamp             = time.time(),
                       mem_limit_bytes       = cg.memory.limit(),
                       cpus_limit            = cg.cpu.limit(),
-                      cpus_user_time_secs   = cg.cpuacct.user_time(),
-                      cpus_system_time_secs = cg.cpuacct.system_time(),
+                    # cpus_user_time_secs   = cg.cpuacct.user_time(),
+                    # cpus_system_time_secs = cg.cpuacct.system_time(),
                       mem_rss_bytes         = cg.memory.rss())
         except AttributeError as e:
             log.error("Missing CGroup!")
