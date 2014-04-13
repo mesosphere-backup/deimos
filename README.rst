@@ -46,8 +46,8 @@ prefix and using the remainder as the image name. The container options are
 passed to ``docker run`` when the task is launched.
 
 If no ``ContainerInfo`` is present in a task, Deimos will still containerize
-it, by using the ``--default_container`` passed to the slave, or taking a
-reasonable guess based on the host's distribution and release.
+it, by using the ``--default_container_image`` passed to the slave, or taking
+a reasonable guess based on the host's distribution and release.
 
 Some options for Docker, like ``-H``, do not apply only to ``docker run``.
 These options should be set in the Deimos configuration file.
