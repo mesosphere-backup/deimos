@@ -20,10 +20,12 @@ function globals {
 }; globals
 
 function ship_it {
-  local host="$1"
   setup.py sdist
-  send "$host"
-  remote "$host" --sudo -- reinstall_deimos /tmp/"$(egg)"
+  for host in "$@"
+  do
+    send "$host"
+    remote "$host" --sudo -- reinstall_deimos /tmp/"$(egg)"
+  done
 }
 
 function send {
