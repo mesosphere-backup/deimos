@@ -21,8 +21,10 @@ def run(options, image, command=[], env={}, cpus=None, mems=None, ports=[]):
         port_pairings = list(itertools.izip_longest(ports, inner_ports(image)))
         log.info("Port pairings (Mesos, Docker) // %r", port_pairings)
         for allocated, target in port_pairings:
-            if allocated is None or target is None: break
-            options += [ "-p", "%d:%d" % (allocated, target) ]
+            if allocated is None:
+                log.warning("Container exposes more ports than were allocated")
+                break
+            options += [ "-p", "%d:%d" % (allocated, target or allocated) ]
     argv  = [ "run" ] + options
     argv += [ "-c", str(cpus) ] if cpus else []
     argv += [ "-m", str(mems) ] if mems else []
