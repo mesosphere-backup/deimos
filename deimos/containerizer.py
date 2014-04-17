@@ -212,7 +212,7 @@ class Docker(Containerizer, _Struct):
         # Docker CID, not a Mesos container ID.
         state = deimos.state.State(self.state_root, docker_id=args[1])
         self.state = state
-        deimos.sig.install(self.signal_docker_and_resume)
+        deimos.sig.install(self.stop_docker_and_resume)
         state.await_launch()
         try:
             state.lock("wait", LOCK_SH, seconds=None)
@@ -241,9 +241,14 @@ class Docker(Containerizer, _Struct):
     def sig_proxy(self, signum):
         if self.runner is not None:
             self.runner.send_signal(signum)
-    def signal_docker_and_resume(self, signum):
-        if self.state is not None and self.state.pid() is not None:
-            os.kill(self.state.pid(), signum)
+    def stop_docker_and_resume(self, signum):
+        if self.state is not None and self.state.cid() is not None:
+            cid = self.state.cid()
+            log.info("Trying to stop Docker container: %s", cid)
+            try:
+                Run()(deimos.docker.stop(cid))
+            except subprocess.CalledProcessError:
+                pass
             return deimos.sig.Resume()
     def default_image(self, task):
         opts = dict(self.index_settings.items(onlyset=True))
