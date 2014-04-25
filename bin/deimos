@@ -1,3 +1,4 @@
+#!/bin/sh
 bin="`dirname "$0"`" && dir="`dirname "$bin"`" &&
 exec python -m deimos.__init__ "$@"
 # A convenience for development. Not installed or used in production.
