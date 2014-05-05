@@ -14,7 +14,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='mesos.proto',
   package='mesos',
-  serialized_pb='\n\x0bmesos.proto\x12\x05mesos\"\x1c\n\x0b\x46rameworkID\x12\r\n\x05value\x18\x01 \x02(\t\"\x18\n\x07OfferID\x12\r\n\x05value\x18\x01 \x02(\t\"\x18\n\x07SlaveID\x12\r\n\x05value\x18\x01 \x02(\t\"\x17\n\x06TaskID\x12\r\n\x05value\x18\x01 \x02(\t\"\x1b\n\nExecutorID\x12\r\n\x05value\x18\x01 \x02(\t\"\x1c\n\x0b\x43ontainerID\x12\r\n\x05value\x18\x01 \x02(\t\"\xa6\x01\n\rFrameworkInfo\x12\x0c\n\x04user\x18\x01 \x02(\t\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\x1e\n\x02id\x18\x03 \x01(\x0b\x32\x12.mesos.FrameworkID\x12\x1b\n\x10\x66\x61ilover_timeout\x18\x04 \x01(\x01:\x01\x30\x12\x19\n\ncheckpoint\x18\x05 \x01(\x08:\x05\x66\x61lse\x12\x0f\n\x04role\x18\x06 \x01(\t:\x01*\x12\x10\n\x08hostname\x18\x07 \x01(\t\"\xfb\x01\n\x0b\x43ommandInfo\x12$\n\x04uris\x18\x01 \x03(\x0b\x32\x16.mesos.CommandInfo.URI\x12\'\n\x0b\x65nvironment\x18\x02 \x01(\x0b\x32\x12.mesos.Environment\x12\r\n\x05value\x18\x03 \x02(\t\x12\x33\n\tcontainer\x18\x04 \x01(\x0b\x32 .mesos.CommandInfo.ContainerInfo\x1a(\n\x03URI\x12\r\n\x05value\x18\x01 \x02(\t\x12\x12\n\nexecutable\x18\x02 \x01(\x08\x1a/\n\rContainerInfo\x12\r\n\x05image\x18\x01 \x02(\t\x12\x0f\n\x07options\x18\x02 \x03(\t\"\xd5\x01\n\x0c\x45xecutorInfo\x12&\n\x0b\x65xecutor_id\x18\x01 \x02(\x0b\x32\x11.mesos.ExecutorID\x12(\n\x0c\x66ramework_id\x18\x08 \x01(\x0b\x32\x12.mesos.FrameworkID\x12#\n\x07\x63ommand\x18\x07 \x02(\x0b\x32\x12.mesos.CommandInfo\x12\"\n\tresources\x18\x05 \x03(\x0b\x32\x0f.mesos.Resource\x12\x0c\n\x04name\x18\t \x01(\t\x12\x0e\n\x06source\x18\n \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x04 \x01(\x0c\"W\n\nMasterInfo\x12\n\n\x02id\x18\x01 \x02(\t\x12\n\n\x02ip\x18\x02 \x02(\r\x12\x12\n\x04port\x18\x03 \x02(\r:\x04\x35\x30\x35\x30\x12\x0b\n\x03pid\x18\x04 \x01(\t\x12\x10\n\x08hostname\x18\x05 \x01(\t\"\xe4\x01\n\tSlaveInfo\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x12\n\x04port\x18\x08 \x01(\x05:\x04\x35\x30\x35\x31\x12\"\n\tresources\x18\x03 \x03(\x0b\x32\x0f.mesos.Resource\x12$\n\nattributes\x18\x05 \x03(\x0b\x32\x10.mesos.Attribute\x12\x1a\n\x02id\x18\x06 \x01(\x0b\x32\x0e.mesos.SlaveID\x12\x19\n\ncheckpoint\x18\x07 \x01(\x08:\x05\x66\x61lse\x12\x16\n\x0ewebui_hostname\x18\x02 \x01(\t\x12\x18\n\nwebui_port\x18\x04 \x01(\x05:\x04\x38\x30\x38\x31\"\xfc\x02\n\x05Value\x12\x1f\n\x04type\x18\x01 \x02(\x0e\x32\x11.mesos.Value.Type\x12#\n\x06scalar\x18\x02 \x01(\x0b\x32\x13.mesos.Value.Scalar\x12#\n\x06ranges\x18\x03 \x01(\x0b\x32\x13.mesos.Value.Ranges\x12\x1d\n\x03set\x18\x04 \x01(\x0b\x32\x10.mesos.Value.Set\x12\x1f\n\x04text\x18\x05 \x01(\x0b\x32\x11.mesos.Value.Text\x1a\x17\n\x06Scalar\x12\r\n\x05value\x18\x01 \x02(\x01\x1a#\n\x05Range\x12\r\n\x05\x62\x65gin\x18\x01 \x02(\x04\x12\x0b\n\x03\x65nd\x18\x02 \x02(\x04\x1a+\n\x06Ranges\x12!\n\x05range\x18\x01 \x03(\x0b\x32\x12.mesos.Value.Range\x1a\x13\n\x03Set\x12\x0c\n\x04item\x18\x01 \x03(\t\x1a\x15\n\x04Text\x12\r\n\x05value\x18\x01 \x02(\t\"1\n\x04Type\x12\n\n\x06SCALAR\x10\x00\x12\n\n\x06RANGES\x10\x01\x12\x07\n\x03SET\x10\x02\x12\x08\n\x04TEXT\x10\x03\"\xc4\x01\n\tAttribute\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x1f\n\x04type\x18\x02 \x02(\x0e\x32\x11.mesos.Value.Type\x12#\n\x06scalar\x18\x03 \x01(\x0b\x32\x13.mesos.Value.Scalar\x12#\n\x06ranges\x18\x04 \x01(\x0b\x32\x13.mesos.Value.Ranges\x12\x1d\n\x03set\x18\x06 \x01(\x0b\x32\x10.mesos.Value.Set\x12\x1f\n\x04text\x18\x05 \x01(\x0b\x32\x11.mesos.Value.Text\"\xb3\x01\n\x08Resource\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x1f\n\x04type\x18\x02 \x02(\x0e\x32\x11.mesos.Value.Type\x12#\n\x06scalar\x18\x03 \x01(\x0b\x32\x13.mesos.Value.Scalar\x12#\n\x06ranges\x18\x04 \x01(\x0b\x32\x13.mesos.Value.Ranges\x12\x1d\n\x03set\x18\x05 \x01(\x0b\x32\x10.mesos.Value.Set\x12\x0f\n\x04role\x18\x06 \x01(\t:\x01*\"\xcc\x02\n\x12ResourceStatistics\x12\x11\n\ttimestamp\x18\x01 \x02(\x01\x12\x1b\n\x13\x63pus_user_time_secs\x18\x02 \x01(\x01\x12\x1d\n\x15\x63pus_system_time_secs\x18\x03 \x01(\x01\x12\x12\n\ncpus_limit\x18\x04 \x02(\x01\x12\x17\n\x0f\x63pus_nr_periods\x18\x07 \x01(\r\x12\x19\n\x11\x63pus_nr_throttled\x18\x08 \x01(\r\x12 \n\x18\x63pus_throttled_time_secs\x18\t \x01(\x01\x12\x15\n\rmem_rss_bytes\x18\x05 \x01(\x04\x12\x17\n\x0fmem_limit_bytes\x18\x06 \x01(\x04\x12\x16\n\x0emem_file_bytes\x18\n \x01(\x04\x12\x16\n\x0emem_anon_bytes\x18\x0b \x01(\x04\x12\x1d\n\x15mem_mapped_file_bytes\x18\x0c \x01(\x04\"\xe9\x01\n\rResourceUsage\x12 \n\x08slave_id\x18\x01 \x02(\x0b\x32\x0e.mesos.SlaveID\x12(\n\x0c\x66ramework_id\x18\x02 \x02(\x0b\x32\x12.mesos.FrameworkID\x12&\n\x0b\x65xecutor_id\x18\x03 \x01(\x0b\x32\x11.mesos.ExecutorID\x12\x15\n\rexecutor_name\x18\x04 \x01(\t\x12\x1e\n\x07task_id\x18\x05 \x01(\x0b\x32\r.mesos.TaskID\x12-\n\nstatistics\x18\x06 \x01(\x0b\x32\x19.mesos.ResourceStatistics\"O\n\x07Request\x12 \n\x08slave_id\x18\x01 \x01(\x0b\x32\x0e.mesos.SlaveID\x12\"\n\tresources\x18\x02 \x03(\x0b\x32\x0f.mesos.Resource\"\xf4\x01\n\x05Offer\x12\x1a\n\x02id\x18\x01 \x02(\x0b\x32\x0e.mesos.OfferID\x12(\n\x0c\x66ramework_id\x18\x02 \x02(\x0b\x32\x12.mesos.FrameworkID\x12 \n\x08slave_id\x18\x03 \x02(\x0b\x32\x0e.mesos.SlaveID\x12\x10\n\x08hostname\x18\x04 \x02(\t\x12\"\n\tresources\x18\x05 \x03(\x0b\x32\x0f.mesos.Resource\x12$\n\nattributes\x18\x07 \x03(\x0b\x32\x10.mesos.Attribute\x12\'\n\x0c\x65xecutor_ids\x18\x06 \x03(\x0b\x32\x11.mesos.ExecutorID\"\xd8\x01\n\x08TaskInfo\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x1e\n\x07task_id\x18\x02 \x02(\x0b\x32\r.mesos.TaskID\x12 \n\x08slave_id\x18\x03 \x02(\x0b\x32\x0e.mesos.SlaveID\x12\"\n\tresources\x18\x04 \x03(\x0b\x32\x0f.mesos.Resource\x12%\n\x08\x65xecutor\x18\x05 \x01(\x0b\x32\x13.mesos.ExecutorInfo\x12#\n\x07\x63ommand\x18\x07 \x01(\x0b\x32\x12.mesos.CommandInfo\x12\x0c\n\x04\x64\x61ta\x18\x06 \x01(\x0c\"\xa1\x01\n\nTaskStatus\x12\x1e\n\x07task_id\x18\x01 \x02(\x0b\x32\r.mesos.TaskID\x12\x1f\n\x05state\x18\x02 \x02(\x0e\x32\x10.mesos.TaskState\x12\x0f\n\x07message\x18\x04 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x03 \x01(\x0c\x12 \n\x08slave_id\x18\x05 \x01(\x0b\x32\x0e.mesos.SlaveID\x12\x11\n\ttimestamp\x18\x06 \x01(\x01\"$\n\x07\x46ilters\x12\x19\n\x0erefuse_seconds\x18\x01 \x01(\x01:\x01\x35\"f\n\x0b\x45nvironment\x12.\n\tvariables\x18\x01 \x03(\x0b\x32\x1b.mesos.Environment.Variable\x1a\'\n\x08Variable\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\t\"\'\n\tParameter\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\t\"1\n\nParameters\x12#\n\tparameter\x18\x01 \x03(\x0b\x32\x10.mesos.Parameter\"/\n\nCredential\x12\x11\n\tprincipal\x18\x01 \x02(\t\x12\x0e\n\x06secret\x18\x02 \x01(\x0c\"2\n\rResourceArray\x12!\n\x08resource\x18\x01 \x03(\x0b\x32\x0f.mesos.Resource\"F\n\x13\x45xternalTermination\x12\x0e\n\x06status\x18\x01 \x02(\r\x12\x0e\n\x06killed\x18\x02 \x02(\x08\x12\x0f\n\x07message\x18\x03 \x02(\t\"!\n\x0e\x45xternalStatus\x12\x0f\n\x07message\x18\x01 \x02(\t*\\\n\x06Status\x12\x16\n\x12\x44RIVER_NOT_STARTED\x10\x01\x12\x12\n\x0e\x44RIVER_RUNNING\x10\x02\x12\x12\n\x0e\x44RIVER_ABORTED\x10\x03\x12\x12\n\x0e\x44RIVER_STOPPED\x10\x04*\x86\x01\n\tTaskState\x12\x10\n\x0cTASK_STAGING\x10\x06\x12\x11\n\rTASK_STARTING\x10\x00\x12\x10\n\x0cTASK_RUNNING\x10\x01\x12\x11\n\rTASK_FINISHED\x10\x02\x12\x0f\n\x0bTASK_FAILED\x10\x03\x12\x0f\n\x0bTASK_KILLED\x10\x04\x12\r\n\tTASK_LOST\x10\x05\x42\x1a\n\x10org.apache.mesosB\x06Protos')
+  serialized_pb='\n\x0bmesos.proto\x12\x05mesos\"\x1c\n\x0b\x46rameworkID\x12\r\n\x05value\x18\x01 \x02(\t\"\x18\n\x07OfferID\x12\r\n\x05value\x18\x01 \x02(\t\"\x18\n\x07SlaveID\x12\r\n\x05value\x18\x01 \x02(\t\"\x17\n\x06TaskID\x12\r\n\x05value\x18\x01 \x02(\t\"\x1b\n\nExecutorID\x12\r\n\x05value\x18\x01 \x02(\t\"\x1c\n\x0b\x43ontainerID\x12\r\n\x05value\x18\x01 \x02(\t\"\xa6\x01\n\rFrameworkInfo\x12\x0c\n\x04user\x18\x01 \x02(\t\x12\x0c\n\x04name\x18\x02 \x02(\t\x12\x1e\n\x02id\x18\x03 \x01(\x0b\x32\x12.mesos.FrameworkID\x12\x1b\n\x10\x66\x61ilover_timeout\x18\x04 \x01(\x01:\x01\x30\x12\x19\n\ncheckpoint\x18\x05 \x01(\x08:\x05\x66\x61lse\x12\x0f\n\x04role\x18\x06 \x01(\t:\x01*\x12\x10\n\x08hostname\x18\x07 \x01(\t\"\x92\x02\n\x0b\x43ommandInfo\x12$\n\x04uris\x18\x01 \x03(\x0b\x32\x16.mesos.CommandInfo.URI\x12\'\n\x0b\x65nvironment\x18\x02 \x01(\x0b\x32\x12.mesos.Environment\x12\r\n\x05value\x18\x03 \x02(\t\x12\x33\n\tcontainer\x18\x04 \x01(\x0b\x32 .mesos.CommandInfo.ContainerInfo\x1a?\n\x03URI\x12\r\n\x05value\x18\x01 \x02(\t\x12\x12\n\nexecutable\x18\x02 \x01(\x08\x12\x15\n\x07\x65xtract\x18\x03 \x01(\x08:\x04true\x1a/\n\rContainerInfo\x12\r\n\x05image\x18\x01 \x02(\t\x12\x0f\n\x07options\x18\x02 \x03(\t\"\xd5\x01\n\x0c\x45xecutorInfo\x12&\n\x0b\x65xecutor_id\x18\x01 \x02(\x0b\x32\x11.mesos.ExecutorID\x12(\n\x0c\x66ramework_id\x18\x08 \x01(\x0b\x32\x12.mesos.FrameworkID\x12#\n\x07\x63ommand\x18\x07 \x02(\x0b\x32\x12.mesos.CommandInfo\x12\"\n\tresources\x18\x05 \x03(\x0b\x32\x0f.mesos.Resource\x12\x0c\n\x04name\x18\t \x01(\t\x12\x0e\n\x06source\x18\n \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x04 \x01(\x0c\"W\n\nMasterInfo\x12\n\n\x02id\x18\x01 \x02(\t\x12\n\n\x02ip\x18\x02 \x02(\r\x12\x12\n\x04port\x18\x03 \x02(\r:\x04\x35\x30\x35\x30\x12\x0b\n\x03pid\x18\x04 \x01(\t\x12\x10\n\x08hostname\x18\x05 \x01(\t\"\xe4\x01\n\tSlaveInfo\x12\x10\n\x08hostname\x18\x01 \x02(\t\x12\x12\n\x04port\x18\x08 \x01(\x05:\x04\x35\x30\x35\x31\x12\"\n\tresources\x18\x03 \x03(\x0b\x32\x0f.mesos.Resource\x12$\n\nattributes\x18\x05 \x03(\x0b\x32\x10.mesos.Attribute\x12\x1a\n\x02id\x18\x06 \x01(\x0b\x32\x0e.mesos.SlaveID\x12\x19\n\ncheckpoint\x18\x07 \x01(\x08:\x05\x66\x61lse\x12\x16\n\x0ewebui_hostname\x18\x02 \x01(\t\x12\x18\n\nwebui_port\x18\x04 \x01(\x05:\x04\x38\x30\x38\x31\"\xfc\x02\n\x05Value\x12\x1f\n\x04type\x18\x01 \x02(\x0e\x32\x11.mesos.Value.Type\x12#\n\x06scalar\x18\x02 \x01(\x0b\x32\x13.mesos.Value.Scalar\x12#\n\x06ranges\x18\x03 \x01(\x0b\x32\x13.mesos.Value.Ranges\x12\x1d\n\x03set\x18\x04 \x01(\x0b\x32\x10.mesos.Value.Set\x12\x1f\n\x04text\x18\x05 \x01(\x0b\x32\x11.mesos.Value.Text\x1a\x17\n\x06Scalar\x12\r\n\x05value\x18\x01 \x02(\x01\x1a#\n\x05Range\x12\r\n\x05\x62\x65gin\x18\x01 \x02(\x04\x12\x0b\n\x03\x65nd\x18\x02 \x02(\x04\x1a+\n\x06Ranges\x12!\n\x05range\x18\x01 \x03(\x0b\x32\x12.mesos.Value.Range\x1a\x13\n\x03Set\x12\x0c\n\x04item\x18\x01 \x03(\t\x1a\x15\n\x04Text\x12\r\n\x05value\x18\x01 \x02(\t\"1\n\x04Type\x12\n\n\x06SCALAR\x10\x00\x12\n\n\x06RANGES\x10\x01\x12\x07\n\x03SET\x10\x02\x12\x08\n\x04TEXT\x10\x03\"\xc4\x01\n\tAttribute\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x1f\n\x04type\x18\x02 \x02(\x0e\x32\x11.mesos.Value.Type\x12#\n\x06scalar\x18\x03 \x01(\x0b\x32\x13.mesos.Value.Scalar\x12#\n\x06ranges\x18\x04 \x01(\x0b\x32\x13.mesos.Value.Ranges\x12\x1d\n\x03set\x18\x06 \x01(\x0b\x32\x10.mesos.Value.Set\x12\x1f\n\x04text\x18\x05 \x01(\x0b\x32\x11.mesos.Value.Text\"\xb3\x01\n\x08Resource\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x1f\n\x04type\x18\x02 \x02(\x0e\x32\x11.mesos.Value.Type\x12#\n\x06scalar\x18\x03 \x01(\x0b\x32\x13.mesos.Value.Scalar\x12#\n\x06ranges\x18\x04 \x01(\x0b\x32\x13.mesos.Value.Ranges\x12\x1d\n\x03set\x18\x05 \x01(\x0b\x32\x10.mesos.Value.Set\x12\x0f\n\x04role\x18\x06 \x01(\t:\x01*\"\xcc\x02\n\x12ResourceStatistics\x12\x11\n\ttimestamp\x18\x01 \x02(\x01\x12\x1b\n\x13\x63pus_user_time_secs\x18\x02 \x01(\x01\x12\x1d\n\x15\x63pus_system_time_secs\x18\x03 \x01(\x01\x12\x12\n\ncpus_limit\x18\x04 \x02(\x01\x12\x17\n\x0f\x63pus_nr_periods\x18\x07 \x01(\r\x12\x19\n\x11\x63pus_nr_throttled\x18\x08 \x01(\r\x12 \n\x18\x63pus_throttled_time_secs\x18\t \x01(\x01\x12\x15\n\rmem_rss_bytes\x18\x05 \x01(\x04\x12\x17\n\x0fmem_limit_bytes\x18\x06 \x01(\x04\x12\x16\n\x0emem_file_bytes\x18\n \x01(\x04\x12\x16\n\x0emem_anon_bytes\x18\x0b \x01(\x04\x12\x1d\n\x15mem_mapped_file_bytes\x18\x0c \x01(\x04\"\xe9\x01\n\rResourceUsage\x12 \n\x08slave_id\x18\x01 \x02(\x0b\x32\x0e.mesos.SlaveID\x12(\n\x0c\x66ramework_id\x18\x02 \x02(\x0b\x32\x12.mesos.FrameworkID\x12&\n\x0b\x65xecutor_id\x18\x03 \x01(\x0b\x32\x11.mesos.ExecutorID\x12\x15\n\rexecutor_name\x18\x04 \x01(\t\x12\x1e\n\x07task_id\x18\x05 \x01(\x0b\x32\r.mesos.TaskID\x12-\n\nstatistics\x18\x06 \x01(\x0b\x32\x19.mesos.ResourceStatistics\"O\n\x07Request\x12 \n\x08slave_id\x18\x01 \x01(\x0b\x32\x0e.mesos.SlaveID\x12\"\n\tresources\x18\x02 \x03(\x0b\x32\x0f.mesos.Resource\"\xf4\x01\n\x05Offer\x12\x1a\n\x02id\x18\x01 \x02(\x0b\x32\x0e.mesos.OfferID\x12(\n\x0c\x66ramework_id\x18\x02 \x02(\x0b\x32\x12.mesos.FrameworkID\x12 \n\x08slave_id\x18\x03 \x02(\x0b\x32\x0e.mesos.SlaveID\x12\x10\n\x08hostname\x18\x04 \x02(\t\x12\"\n\tresources\x18\x05 \x03(\x0b\x32\x0f.mesos.Resource\x12$\n\nattributes\x18\x07 \x03(\x0b\x32\x10.mesos.Attribute\x12\'\n\x0c\x65xecutor_ids\x18\x06 \x03(\x0b\x32\x11.mesos.ExecutorID\"\xd8\x01\n\x08TaskInfo\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x1e\n\x07task_id\x18\x02 \x02(\x0b\x32\r.mesos.TaskID\x12 \n\x08slave_id\x18\x03 \x02(\x0b\x32\x0e.mesos.SlaveID\x12\"\n\tresources\x18\x04 \x03(\x0b\x32\x0f.mesos.Resource\x12%\n\x08\x65xecutor\x18\x05 \x01(\x0b\x32\x13.mesos.ExecutorInfo\x12#\n\x07\x63ommand\x18\x07 \x01(\x0b\x32\x12.mesos.CommandInfo\x12\x0c\n\x04\x64\x61ta\x18\x06 \x01(\x0c\"\xa1\x01\n\nTaskStatus\x12\x1e\n\x07task_id\x18\x01 \x02(\x0b\x32\r.mesos.TaskID\x12\x1f\n\x05state\x18\x02 \x02(\x0e\x32\x10.mesos.TaskState\x12\x0f\n\x07message\x18\x04 \x01(\t\x12\x0c\n\x04\x64\x61ta\x18\x03 \x01(\x0c\x12 \n\x08slave_id\x18\x05 \x01(\x0b\x32\x0e.mesos.SlaveID\x12\x11\n\ttimestamp\x18\x06 \x01(\x01\"$\n\x07\x46ilters\x12\x19\n\x0erefuse_seconds\x18\x01 \x01(\x01:\x01\x35\"f\n\x0b\x45nvironment\x12.\n\tvariables\x18\x01 \x03(\x0b\x32\x1b.mesos.Environment.Variable\x1a\'\n\x08Variable\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\t\"\'\n\tParameter\x12\x0b\n\x03key\x18\x01 \x02(\t\x12\r\n\x05value\x18\x02 \x02(\t\"1\n\nParameters\x12#\n\tparameter\x18\x01 \x03(\x0b\x32\x10.mesos.Parameter\"/\n\nCredential\x12\x11\n\tprincipal\x18\x01 \x02(\t\x12\x0e\n\x06secret\x18\x02 \x01(\x0c*\\\n\x06Status\x12\x16\n\x12\x44RIVER_NOT_STARTED\x10\x01\x12\x12\n\x0e\x44RIVER_RUNNING\x10\x02\x12\x12\n\x0e\x44RIVER_ABORTED\x10\x03\x12\x12\n\x0e\x44RIVER_STOPPED\x10\x04*\x86\x01\n\tTaskState\x12\x10\n\x0cTASK_STAGING\x10\x06\x12\x11\n\rTASK_STARTING\x10\x00\x12\x10\n\x0cTASK_RUNNING\x10\x01\x12\x11\n\rTASK_FINISHED\x10\x02\x12\x0f\n\x0bTASK_FAILED\x10\x03\x12\x0f\n\x0bTASK_KILLED\x10\x04\x12\r\n\tTASK_LOST\x10\x05\x42\x1a\n\x10org.apache.mesosB\x06Protos')
 
 _STATUS = _descriptor.EnumDescriptor(
   name='Status',
@@ -41,8 +41,8 @@ _STATUS = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=3635,
-  serialized_end=3727,
+  serialized_start=3499,
+  serialized_end=3591,
 )
 
 Status = enum_type_wrapper.EnumTypeWrapper(_STATUS)
@@ -83,8 +83,8 @@ _TASKSTATE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=3730,
-  serialized_end=3864,
+  serialized_start=3594,
+  serialized_end=3728,
 )
 
 TaskState = enum_type_wrapper.EnumTypeWrapper(_TASKSTATE)
@@ -126,8 +126,8 @@ _VALUE_TYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1479,
-  serialized_end=1528,
+  serialized_start=1502,
+  serialized_end=1551,
 )
 
 
@@ -390,6 +390,13 @@ _COMMANDINFO_URI = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='extract', full_name='mesos.CommandInfo.URI.extract', index=2,
+      number=3, type=8, cpp_type=7, label=1,
+      has_default_value=True, default_value=True,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -400,7 +407,7 @@ _COMMANDINFO_URI = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=520,
-  serialized_end=560,
+  serialized_end=583,
 )
 
 _COMMANDINFO_CONTAINERINFO = _descriptor.Descriptor(
@@ -433,8 +440,8 @@ _COMMANDINFO_CONTAINERINFO = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=562,
-  serialized_end=609,
+  serialized_start=585,
+  serialized_end=632,
 )
 
 _COMMANDINFO = _descriptor.Descriptor(
@@ -482,7 +489,7 @@ _COMMANDINFO = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=358,
-  serialized_end=609,
+  serialized_end=632,
 )
 
 
@@ -551,8 +558,8 @@ _EXECUTORINFO = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=612,
-  serialized_end=825,
+  serialized_start=635,
+  serialized_end=848,
 )
 
 
@@ -607,8 +614,8 @@ _MASTERINFO = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=827,
-  serialized_end=914,
+  serialized_start=850,
+  serialized_end=937,
 )
 
 
@@ -684,8 +691,8 @@ _SLAVEINFO = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=917,
-  serialized_end=1145,
+  serialized_start=940,
+  serialized_end=1168,
 )
 
 
@@ -712,8 +719,8 @@ _VALUE_SCALAR = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1328,
-  serialized_end=1351,
+  serialized_start=1351,
+  serialized_end=1374,
 )
 
 _VALUE_RANGE = _descriptor.Descriptor(
@@ -746,8 +753,8 @@ _VALUE_RANGE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1353,
-  serialized_end=1388,
+  serialized_start=1376,
+  serialized_end=1411,
 )
 
 _VALUE_RANGES = _descriptor.Descriptor(
@@ -773,8 +780,8 @@ _VALUE_RANGES = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1390,
-  serialized_end=1433,
+  serialized_start=1413,
+  serialized_end=1456,
 )
 
 _VALUE_SET = _descriptor.Descriptor(
@@ -800,8 +807,8 @@ _VALUE_SET = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1435,
-  serialized_end=1454,
+  serialized_start=1458,
+  serialized_end=1477,
 )
 
 _VALUE_TEXT = _descriptor.Descriptor(
@@ -827,8 +834,8 @@ _VALUE_TEXT = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1456,
-  serialized_end=1477,
+  serialized_start=1479,
+  serialized_end=1500,
 )
 
 _VALUE = _descriptor.Descriptor(
@@ -883,8 +890,8 @@ _VALUE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1148,
-  serialized_end=1528,
+  serialized_start=1171,
+  serialized_end=1551,
 )
 
 
@@ -946,8 +953,8 @@ _ATTRIBUTE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1531,
-  serialized_end=1727,
+  serialized_start=1554,
+  serialized_end=1750,
 )
 
 
@@ -1009,8 +1016,8 @@ _RESOURCE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1730,
-  serialized_end=1909,
+  serialized_start=1753,
+  serialized_end=1932,
 )
 
 
@@ -1114,8 +1121,8 @@ _RESOURCESTATISTICS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1912,
-  serialized_end=2244,
+  serialized_start=1935,
+  serialized_end=2267,
 )
 
 
@@ -1177,8 +1184,8 @@ _RESOURCEUSAGE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2247,
-  serialized_end=2480,
+  serialized_start=2270,
+  serialized_end=2503,
 )
 
 
@@ -1212,8 +1219,8 @@ _REQUEST = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2482,
-  serialized_end=2561,
+  serialized_start=2505,
+  serialized_end=2584,
 )
 
 
@@ -1282,8 +1289,8 @@ _OFFER = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2564,
-  serialized_end=2808,
+  serialized_start=2587,
+  serialized_end=2831,
 )
 
 
@@ -1352,8 +1359,8 @@ _TASKINFO = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=2811,
-  serialized_end=3027,
+  serialized_start=2834,
+  serialized_end=3050,
 )
 
 
@@ -1415,8 +1422,8 @@ _TASKSTATUS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=3030,
-  serialized_end=3191,
+  serialized_start=3053,
+  serialized_end=3214,
 )
 
 
@@ -1443,8 +1450,8 @@ _FILTERS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=3193,
-  serialized_end=3229,
+  serialized_start=3216,
+  serialized_end=3252,
 )
 
 
@@ -1478,8 +1485,8 @@ _ENVIRONMENT_VARIABLE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=3294,
-  serialized_end=3333,
+  serialized_start=3317,
+  serialized_end=3356,
 )
 
 _ENVIRONMENT = _descriptor.Descriptor(
@@ -1505,8 +1512,8 @@ _ENVIRONMENT = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=3231,
-  serialized_end=3333,
+  serialized_start=3254,
+  serialized_end=3356,
 )
 
 
@@ -1540,8 +1547,8 @@ _PARAMETER = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=3335,
-  serialized_end=3374,
+  serialized_start=3358,
+  serialized_end=3397,
 )
 
 
@@ -1568,8 +1575,8 @@ _PARAMETERS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=3376,
-  serialized_end=3425,
+  serialized_start=3399,
+  serialized_end=3448,
 )
 
 
@@ -1603,106 +1610,8 @@ _CREDENTIAL = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=3427,
-  serialized_end=3474,
-)
-
-
-_RESOURCEARRAY = _descriptor.Descriptor(
-  name='ResourceArray',
-  full_name='mesos.ResourceArray',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='resource', full_name='mesos.ResourceArray.resource', index=0,
-      number=1, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  extension_ranges=[],
-  serialized_start=3476,
-  serialized_end=3526,
-)
-
-
-_EXTERNALTERMINATION = _descriptor.Descriptor(
-  name='ExternalTermination',
-  full_name='mesos.ExternalTermination',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='status', full_name='mesos.ExternalTermination.status', index=0,
-      number=1, type=13, cpp_type=3, label=2,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='killed', full_name='mesos.ExternalTermination.killed', index=1,
-      number=2, type=8, cpp_type=7, label=2,
-      has_default_value=False, default_value=False,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='message', full_name='mesos.ExternalTermination.message', index=2,
-      number=3, type=9, cpp_type=9, label=2,
-      has_default_value=False, default_value=unicode("", "utf-8"),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  extension_ranges=[],
-  serialized_start=3528,
-  serialized_end=3598,
-)
-
-
-_EXTERNALSTATUS = _descriptor.Descriptor(
-  name='ExternalStatus',
-  full_name='mesos.ExternalStatus',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='message', full_name='mesos.ExternalStatus.message', index=0,
-      number=1, type=9, cpp_type=9, label=2,
-      has_default_value=False, default_value=unicode("", "utf-8"),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  extension_ranges=[],
-  serialized_start=3600,
-  serialized_end=3633,
+  serialized_start=3450,
+  serialized_end=3497,
 )
 
 _FRAMEWORKINFO.fields_by_name['id'].message_type = _FRAMEWORKID
@@ -1763,7 +1672,6 @@ _TASKSTATUS.fields_by_name['slave_id'].message_type = _SLAVEID
 _ENVIRONMENT_VARIABLE.containing_type = _ENVIRONMENT;
 _ENVIRONMENT.fields_by_name['variables'].message_type = _ENVIRONMENT_VARIABLE
 _PARAMETERS.fields_by_name['parameter'].message_type = _PARAMETER
-_RESOURCEARRAY.fields_by_name['resource'].message_type = _RESOURCE
 DESCRIPTOR.message_types_by_name['FrameworkID'] = _FRAMEWORKID
 DESCRIPTOR.message_types_by_name['OfferID'] = _OFFERID
 DESCRIPTOR.message_types_by_name['SlaveID'] = _SLAVEID
@@ -1789,9 +1697,6 @@ DESCRIPTOR.message_types_by_name['Environment'] = _ENVIRONMENT
 DESCRIPTOR.message_types_by_name['Parameter'] = _PARAMETER
 DESCRIPTOR.message_types_by_name['Parameters'] = _PARAMETERS
 DESCRIPTOR.message_types_by_name['Credential'] = _CREDENTIAL
-DESCRIPTOR.message_types_by_name['ResourceArray'] = _RESOURCEARRAY
-DESCRIPTOR.message_types_by_name['ExternalTermination'] = _EXTERNALTERMINATION
-DESCRIPTOR.message_types_by_name['ExternalStatus'] = _EXTERNALSTATUS
 
 class FrameworkID(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -1990,24 +1895,6 @@ class Credential(_message.Message):
   DESCRIPTOR = _CREDENTIAL
 
   # @@protoc_insertion_point(class_scope:mesos.Credential)
-
-class ResourceArray(_message.Message):
-  __metaclass__ = _reflection.GeneratedProtocolMessageType
-  DESCRIPTOR = _RESOURCEARRAY
-
-  # @@protoc_insertion_point(class_scope:mesos.ResourceArray)
-
-class ExternalTermination(_message.Message):
-  __metaclass__ = _reflection.GeneratedProtocolMessageType
-  DESCRIPTOR = _EXTERNALTERMINATION
-
-  # @@protoc_insertion_point(class_scope:mesos.ExternalTermination)
-
-class ExternalStatus(_message.Message):
-  __metaclass__ = _reflection.GeneratedProtocolMessageType
-  DESCRIPTOR = _EXTERNALSTATUS
-
-  # @@protoc_insertion_point(class_scope:mesos.ExternalStatus)
 
 
 DESCRIPTOR.has_options = True

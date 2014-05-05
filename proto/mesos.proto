@@ -128,19 +128,31 @@ message FrameworkInfo {
  * uri is set, executable file permission is set on the downloaded file.
  * Otherwise, if the downloaded file has a recognized archive extension
  * (currently [compressed] tar and zip) it is extracted into the executor's
- * working directory.  In addition, any environment variables are set before
- * executing the command (so they can be used to "parameterize" your command).
+ * working directory. This extraction can be disabled by setting `extract` to
+ * false. In addition, any environment variables are set before executing
+ * the command (so they can be used to "parameterize" your command).
  */
 message CommandInfo {
   message URI {
     required string value = 1;
     optional bool executable = 2;
+    optional bool extract = 3 [default = true];
   }
 
-  // Describes a container that may be used once external isolation has been
-  // selected for the slave.
+  // Describes a container.
+  // Not all containerizers currently implement ContainerInfo, so it
+  // is possible that a launched task will fail due to supplying this
+  // attribute.
+  // NOTE: The containerizer API is currently in an early beta or
+  // even alpha state. Some details, like the exact semantics of an
+  // "image" or "options" are not yet hardened.
+  // TODO(tillt): Describe the exact scheme and semantics of "image"
+  // and "options".
   message ContainerInfo {
+    // URI describing the container image name.
     required string image = 1;
+
+    // Describes additional options passed to the containerizer.
     repeated string options = 2;
   }
 
@@ -148,6 +160,8 @@ message CommandInfo {
   optional Environment environment = 2;
   required string value = 3;
 
+  // NOTE: MesosContainerizer does currently not support this attribute
+  // and tasks supplying a 'container' will fail.
   optional ContainerInfo container = 4;
 }
 
@@ -473,39 +487,12 @@ message Parameters {
 /**
  * Credential used for authentication.
  *
- * NOTE: The 'principal' is used for authenticating the framework with
- * the master. This is different from 'FrameworkInfo.user'
+ * NOTE: The 'principal' is used for authenticating the framework or slave
+ * with the master. This is different from 'FrameworkInfo.user'
  * which is used to determine the user under which the framework's
  * executors/tasks are run.
  */
 message Credential {
   required string principal = 1;
   optional bytes secret = 2;
-}
-
-
-/**
- * Collection of Resource.
- */
-message ResourceArray {
-  repeated Resource resource = 1;
-}
-
-
-/**
- * Describes an external containerizer's termination.
- */
-message ExternalTermination {
-  required uint32 status = 1;
-  required bool killed = 2;
-  required string message = 3;
-}
-
-
-/**
- * Describes an external containerizer's status.
- */
-message ExternalStatus {
-  // This message does not have to adhere to any scheme.
-  required string message = 1;
 }
