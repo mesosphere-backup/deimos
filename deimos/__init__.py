@@ -89,36 +89,41 @@ def cli(argv=None):
 
 def format_help():
     return """
- USAGE: deimos launch  <container-id> (--executor /a/path)? < taskInfo.pb
-        deimos usage   <container-id> > resources.pb
-        deimos destroy <container-id>
-        deimos wait --docker <docker-id>
+ USAGE: deimos launch  (--no-fork)?
+        deimos usage
+        deimos destroy
+        deimos wait    (--docker <docker-id>)?
         deimos locks
         deimos state
 
   Deimos provides Mesos integration for Docker, allowing Docker to be used as
   an external containerizer.
 
- deimos launch <container-id> (--executor /a/path)?
+ deimos launch (--no-fork)?
 
   Launches a container and runs the executor or command specified in the
-  TaskInfo, passed in on standard in. The path passed as the --executor option
-  is used when the task specifies a command and no actual executor -- the
-  passed program is run as an "observer" to communicate task status to the
-  local Mesos node.
+  TaskInfo, passed in on standard in.
 
- deimos usage <container-id>
+  The launch subcommand always watches the launched container and logs changes
+  in its lifecycle. By default, it forks off a child to do the watching, as
+  part of the contract external containerizers have with Mesos. With
+  --no-fork, launch will watch the container and log in the foreground. This
+  can be helpful during debugging.
+
+ deimos usage
 
   Generates a protobuf description of the resources used by the container.
 
- deimos destroy <container-id>
+ deimos destroy
 
   Shuts down the specified container.
 
- deimos wait --docker <docker-id>
+ deimos wait (--docker <docker-id>)?
 
-  Waits for a particular Docker CID to exit and records the result in the
-  state directory, returning an appropriate exit code.
+  Without --docker, reads STDIN to find the container to watch.
+
+  With --docker, waits for a particular Docker CID to exit and records the
+  result in the state directory, returning an appropriate exit code.
 
  deimos locks
 

@@ -11,10 +11,12 @@ import subprocess
 import sys
 import time
 
-import google.protobuf
-
-try:    import mesos_pb2 as protos                 # Prefer system installation
-except: import deimos.mesos_pb2 as protos
+try:                  # Prefer system installation of Mesos protos if available
+    import mesos_pb2 as protos
+    import containerizer_pb2 as protos
+except:
+    import deimos.mesos_pb2 as protos
+    import deimos.containerizer_pb2 as protos
 
 import deimos.cgroups
 from deimos.cmd import Run
@@ -24,7 +26,9 @@ import deimos.docker
 from deimos.err import Err
 import deimos.logger
 from deimos.logger import log
+import deimos.mesos
 import deimos.path
+from deimos.proto import recordio
 from deimos._struct import _Struct
 import deimos.state
 import deimos.sig
@@ -32,11 +36,11 @@ import deimos.sig
 
 class Containerizer(object):
     def __init__(self): pass
-    def launch(self, container_id, *args): pass
-    def update(self, container_id, *args): pass
-    def usage(self, container_id, *args): pass
-    def wait(self, container_id, *args): pass
-    def destroy(self, container_id, *args): pass
+    def launch(self, *args): pass
+    def update(self, *args): pass
+    def usage(self, *args): pass
+    def wait(self, *args): pass
+    def destroy(self, *args): pass
     def __call__(self, *args):
         try:
             name   = args[0]
@@ -71,33 +75,39 @@ class Docker(Containerizer, _Struct):
                                index_settings=index_settings,
                                runner=None,
                                state=None)
-    def launch(self, container_id, *args):
-        log.info(" ".join([container_id] + list(args)))
-        deimos.sig.install(self.sig_proxy)
+    def launch(self, *args):
+        log.info(" ".join(args))
+        fork = False if "--no-fork" in args else True
+        deimos.sig.install(self.log_signal)
         run_options = []
-        state = deimos.state.State(self.state_root, mesos_id=container_id)
+        proto = recordio.read(protos.Launch)
+        launchy = deimos.mesos.Launch(proto)
+        state = deimos.state.State(self.state_root,
+                                   mesos_id=launchy.container_id)
         state.push()
         lk_l = state.lock("launch", LOCK_EX)
-        mesos_directory()
-        task = protos.TaskInfo()
-        task.ParseFromString(sys.stdin.read())
-        for line in proto_lines(task):
-            log.debug(line)
-        state.executor_id = executor_id(task)
+        # We ignore the executor_info in the Launch message for now but in the
+        # future it will mean something.
+        state.executor_id = launchy.executor_id
         state.push()
         state.ids()
-        url, options = self.container_settings.override(*container(task))
+        mesos_directory() # Redundant?
+        if launchy.directory:
+            os.chdir(launchy.directory)
+        # TODO: if launchy.user:
+        #           os.seteuid(launchy.user)
+        url, options = self.container_settings.override(*launchy.container)
         pre, image = url.split("docker:///")
         if pre != "":
             raise Err("URL '%s' is not a valid docker:// URL!" % url)
         if image == "":
-            image = self.default_image(task)
+            image = self.default_image(launchy)
         log.info("image  = %s", image)
         run_options += [ "--sig-proxy" ]
         run_options += [ "--rm" ]     # This is how we ensure container cleanup
         run_options += [ "--cidfile", state.resolve("cid") ]
 
-        place_uris(task, self.shared_dir, self.optimistic_unpack)
+        place_uris(launchy, self.shared_dir, self.optimistic_unpack)
         run_options += [ "-w", self.workdir ]
 
         # Docker requires an absolute path to a source filesystem, separated
@@ -109,8 +119,8 @@ class Docker(Containerizer, _Struct):
         sandbox_symlink = state.sandbox_symlink(shared_full)
         run_options += [ "-v", "%s:%s" % (sandbox_symlink, self.workdir) ]
 
-        cpus, mems = cpu_and_mem(task)
-        env = [(_.name, _.value) for _ in task.command.environment.variables]
+        cpus, mems = launchy.cpu_and_mem
+        env = launchy.env
         run_options += options
 
         # We need to wrap the call to Docker in a call to the Mesos executor
@@ -118,17 +128,14 @@ class Docker(Containerizer, _Struct):
         # MESOS_* environment variables in to the container if we're going to
         # start an executor.
         observer_argv = None
-        if needs_executor_wrapper(task):
-            options = ["--mesos-executor", "--observer"]
-            if not(len(args) > 1 and args[0] in options):
-                raise Err("Task %s needs --observer to be set!" % state.eid())
-            observer_argv = list(args[1:]) + [ deimos.path.me(),
-                                               "wait", "--docker" ]
+        if launchy.needs_observer:
+            observer_argv = [ mesos_executor(),
+                              deimos.path.me(), "wait", "--docker" ]
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
-        runner_argv = deimos.docker.run(run_options, image, argv(task),
-                                        env=env, ports=ports(task),
+        runner_argv = deimos.docker.run(run_options, image, launchy.argv,
+                                        env=env, ports=launchy.ports,
                                         cpus=cpus, mems=mems)
 
         log_mesos_env(logging.DEBUG)
@@ -147,9 +154,6 @@ class Docker(Containerizer, _Struct):
                     lk_w = state.lock("wait", LOCK_EX)
                     lk_l.unlock()
                     state.ids()
-                    proto_out(protos.ExternalStatus, message="launch: ok")
-                    sys.stdout.close()  # Mark STDOUT as closed for Python code
-                    os.close(1) # Use low-level call to close OS side of STDOUT
                     if observer_argv is not None:
                         observer_argv += [state.cid()]
                         log.info(deimos.cmd.present(observer_argv))
@@ -168,6 +172,13 @@ class Docker(Containerizer, _Struct):
                                                           stdout=obs_out,
                                                           stderr=obs_err,
                                                           close_fds=True)
+#                   else:
+#                       if fork:
+#                           pid = os.fork()
+#                           if pid is not 0:
+#                               state.ids()
+#                               log.info("Forking watcher into child...")
+#                               return 1
         data = Run(data=True)(deimos.docker.wait(state.cid()))
         state.exit(data)
         lk_w.unlock()
@@ -176,8 +187,13 @@ class Docker(Containerizer, _Struct):
                 continue
             log.warning(deimos.cmd.present(arr, p.wait()))
         return state.exit()
-    def usage(self, container_id, *args):
-        log.info(" ".join([container_id] + list(args)))
+    def update(self, *args):
+        log.info(" ".join(args))
+        log.info("Update is a no-op for Docker...")
+    def usage(self, *args):
+        log.info(" ".join(args))
+        message = recordio.read(protos.Usage)
+        container_id = message.container_id.value
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.await_launch()
         state.ids()
@@ -192,25 +208,28 @@ class Docker(Containerizer, _Struct):
             log.info("Container has no CGroups...already stopped?")
             return 0
         try:
-            proto_out(protos.ResourceStatistics,
-                      timestamp             = time.time(),
-                      mem_limit_bytes       = cg.memory.limit(),
-                      cpus_limit            = cg.cpu.limit(),
-                    # cpus_user_time_secs   = cg.cpuacct.user_time(),
-                    # cpus_system_time_secs = cg.cpuacct.system_time(),
-                      mem_rss_bytes         = cg.memory.rss())
+            recordio.write(protos.ResourceStatistics,
+                           timestamp             = time.time(),
+                           mem_limit_bytes       = cg.memory.limit(),
+                           cpus_limit            = cg.cpu.limit(),
+                         # cpus_user_time_secs   = cg.cpuacct.user_time(),
+                         # cpus_system_time_secs = cg.cpuacct.system_time(),
+                           mem_rss_bytes         = cg.memory.rss())
         except AttributeError as e:
             log.error("Missing CGroup!")
             raise e
         return 0
     def wait(self, *args):
-        log.info(" ".join(list(args)))
-        if list(args[0:1]) != ["--docker"]:
-            return      # We rely on the Mesos default wait strategy in general
-        # In Docker mode, we use Docker wait to wait for the container and
-        # then exit with the returned exit code. The passed in ID should be a
-        # Docker CID, not a Mesos container ID.
-        state = deimos.state.State(self.state_root, docker_id=args[1])
+        log.info(" ".join(args))
+        if list(args[0:1]) == ["--docker"]:
+            # In Docker mode, we use Docker wait to wait for the container
+            # and then exit with the returned exit code. The Docker CID is
+            # passed on the command line.
+            state = deimos.state.State(self.state_root, docker_id=args[1])
+        else:
+            message = recordio.read(protos.Wait)
+            container_id = message.container_id.value
+            state = deimos.state.State(self.state_root, mesos_id=container_id)
         self.state = state
         deimos.sig.install(self.stop_docker_and_resume)
         state.await_launch()
@@ -220,11 +239,17 @@ class Docker(Containerizer, _Struct):
             if e.errno != errno.EINTR:
                 raise e
             state.lock("wait", LOCK_SH, 1)
+        recordio.write(protos.Termination,
+                       killed  = False,
+                       message = "",
+                       status  = (state.exit() or 255))
         if state.exit() is not None:
             return state.exit()
         raise Err("Wait lock is not held nor is exit file present")
-    def destroy(self, container_id, *args):
-        log.info(" ".join([container_id] + list(args)))
+    def destroy(self, *args):
+        log.info(" ".join(args))
+        message = recordio.read(protos.Destroy)
+        container_id = message.container_id.value
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.await_launch()
         lk_d = state.lock("destroy", LOCK_EX)
@@ -232,15 +257,9 @@ class Docker(Containerizer, _Struct):
             Run()(deimos.docker.stop(state.cid()))
         else:
             log.info("Container is stopped")
-        if not sys.stdout.closed:
-            # If we're called as part of the signal handler set up by launch,
-            # STDOUT is probably closed already. Writing the Protobuf would
-            # only result in a bevy of error messages.
-            proto_out(protos.ExternalStatus, message="destroy: ok")
         return 0
-    def sig_proxy(self, signum):
-        if self.runner is not None:
-            self.runner.send_signal(signum)
+    def log_signal(self, signum):
+        pass
     def stop_docker_and_resume(self, signum):
         if self.state is not None and self.state.cid() is not None:
             cid = self.state.cid()
@@ -250,66 +269,15 @@ class Docker(Containerizer, _Struct):
             except subprocess.CalledProcessError:
                 pass
             return deimos.sig.Resume()
-    def default_image(self, task):
+    def default_image(self, launchy):
         opts = dict(self.index_settings.items(onlyset=True))
         if "account_libmesos" in opts:
-            if not needs_executor_wrapper(task):
+            if not launchy.needs_observer:
                 opts["account"] = opts["account_libmesos"]
             del opts["account_libmesos"]
         return deimos.docker.matching_image_for_host(**opts)
 
 ####################################################### Mesos interface helpers
-
-def fetch_command(task):
-    if task.HasField("executor"):
-        return task.executor.command
-    return task.command
-
-def fetch_container(task):
-    cmd = fetch_command(task)
-    if cmd.HasField("container"):
-        return cmd.container
-
-def container(task):
-    container = fetch_container(task)
-    if container is not None:
-        return container.image, list(container.options)
-    return "docker:///", []
-
-def argv(task):
-    cmd = fetch_command(task)
-    if cmd.HasField("value") and cmd.value != "":
-        return ["sh", "-c", cmd.value]
-    return []
-
-def uris(task):
-    return fetch_command(task).uris
-
-def executor_id(task):
-    if needs_executor_wrapper(task):
-        return task.task_id.value
-    else:
-        return task.executor.executor_id.value
-
-def ports(task):
-    resources = [ _.ranges.range for _ in task.resources if _.name == 'ports' ]
-    ranges = [ _ for __ in resources for _ in __ ]
-    # NB: Casting long() to int() so there's no trailing 'L' in later
-    #     stringifications. Ports should only ever be shorts, anyways.
-    ports = [ range(int(_.begin), int(_.end)+1) for _ in ranges ]
-    return [ port for r in ports for port in r ]
-
-def cpu_and_mem(task):
-    cpu, mem = None, None
-    for r in task.resources:
-        if r.name == "cpus":
-            cpu = str(int(r.scalar.value * 1024))
-        if r.name == "mem":
-            mem = str(int(r.scalar.value)) + "m"
-    return (cpu, mem)
-
-def needs_executor_wrapper(task):
-    return not task.HasField("executor")
 
 MESOS_ESSENTIAL_ENV = [ "MESOS_SLAVE_ID",     "MESOS_SLAVE_PID",
                         "MESOS_FRAMEWORK_ID", "MESOS_EXECUTOR_ID" ]
@@ -331,10 +299,17 @@ def mesos_directory():
         log.info("Changing directory to MESOS_DIRECTORY=%s", task_dir)
         os.chdir(task_dir)
 
-def place_uris(task, directory, optimistic_unpack=False):
+def mesos_executor():
+    return os.path.join(os.environ["MESOS_LIBEXEC_DIRECTORY"],
+                        "mesos-executor")
+
+def mesos_default_image():
+    return os.environ.get("MESOS_DEFAULT_CONTAINER_IMAGE")
+
+def place_uris(launchy, directory, optimistic_unpack=False):
     cmd = deimos.cmd.Run()
     cmd(["mkdir", "-p", directory])
-    for item in uris(task):
+    for item in launchy.uris:
         uri = item.value
         gen_unpack_cmd = unpacker(uri) if optimistic_unpack else None
         log.info("Retrieving URI: %s", deimos.cmd.escape([uri]))
@@ -364,25 +339,4 @@ def unpacker(uri):
         return lambda f, directory: ["tar", "-C", directory, "-xf", f]
     if re.search(r"[.]zip$", uri):
         return lambda f, directory: ["unzip", "-d", directory, f]
-
-
-####################################################### IO & system interaction
-
-def proto_out(cls, **properties):
-    """
-    With a Protobuf class and properies as keyword arguments, sets all the
-    properties on a new instance of the class and serializes the resulting
-    value to stdout.
-    """
-    obj = cls()
-    for k, v in properties.iteritems():
-        log.debug("%s.%s = %r", cls.__name__, k, v)
-        setattr(obj, k, v)
-    data = obj.SerializeToString()
-    sys.stdout.write(data)
-    sys.stdout.flush()
-
-def proto_lines(proto):
-    s = google.protobuf.text_format.MessageToString(proto)
-    return s.strip().split("\n")
 
