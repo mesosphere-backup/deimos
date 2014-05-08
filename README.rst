@@ -16,6 +16,8 @@ stable release of Deimos as well.
 Installation
 ------------
 
+For a complete installation walkthrough, see `this Gist`_.
+
 Deimos can be installed `from the Cheeseshop`_.
 
 .. code-block:: bash
@@ -25,8 +27,9 @@ Deimos can be installed `from the Cheeseshop`_.
 Although Deimos does not have a library dependency on a particular Mesos
 version, one does need a development version of the `Mesos package`_ (for which
 there are also `Python bindings`_), available only for very recent Ubuntu, to
-try out external containerizers. Official support for external containerizers
-will be available in the next Mesos release (0.19).
+try out external containerizers. If you want to use Deimos together with
+Marathon, please use `this patched Marathon`_. Official support for external
+containerizers will be available in the next Mesos release (0.19).
 
 ----------------------------
 Passing Parameters to Docker
@@ -144,3 +147,6 @@ The packaged version of Mesos can also load these options from files:
 
 .. _`Python bindings`: http://downloads.mesosphere.io/master/ubuntu/13.10/mesos_0.19.0-xcon2_amd64.egg
 
+.. _`this Gist`: https://gist.github.com/solidsnack/10944095
+
+.. _`this patched Marathon`: http://downloads.mesosphere.io/marathon/marathon_0.5.0-xcon2_noarch.deb
