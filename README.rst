@@ -5,6 +5,12 @@ deimos
 Deimos is a Docker plugin for Mesos, providing external containerization as
 described in `MESOS-816`_.
 
+**NOTE**: Deimos is currently under heavy development and relies on very recent
+changes in Mesos master that have not been released yet. Be prepared for some
+bumps and changing APIs. If you run into trouble, please file an issue on
+Github.  Official support for external containerizers like Deimos will be
+available in the next Mesos release (0.19), at which point there will be a
+stable release of Deimos as well.
 
 ------------
 Installation
@@ -17,10 +23,10 @@ Deimos can be installed `from the Cheeseshop`_.
     pip install deimos
 
 Although Deimos does not have a library dependency on a particular Mesos
-version, one does need a development version of the `Mesos package`_
-(for which there are also `Python bindings`_), available only for very recent
-Ubuntu, to try out external containerizers.
-
+version, one does need a development version of the `Mesos package`_ (for which
+there are also `Python bindings`_), available only for very recent Ubuntu, to
+try out external containerizers. Official support for external containerizers
+will be available in the next Mesos release (0.19).
 
 ----------------------------
 Passing Parameters to Docker
