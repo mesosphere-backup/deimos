@@ -122,7 +122,7 @@ class PGScheduler(Scheduler):
 class ExecutorScheduler(Scheduler):
     sh = "python deimos-test.py --executor"
     this = "file://" + os.path.abspath(__file__)
-    libmesos = "docker:///mesosphere/libmesos"
+    libmesos = "docker:///libmesos/ubuntu"
     shutdown_message = "shutdown"
     def __init__(self, command=sh, uris=[this], container=libmesos, trials=10):
         Scheduler.__init__(self, trials)
