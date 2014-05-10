@@ -251,7 +251,7 @@ class Docker(Containerizer, _Struct):
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.await_launch()
         lk_d = state.lock("destroy", LOCK_EX)
-        if state.exit() is not None:
+        if state.exit() is None:
             Run()(deimos.docker.stop(state.cid()))
         else:
             log.info("Container is stopped")
