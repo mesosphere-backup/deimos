@@ -86,8 +86,6 @@ class Docker(Containerizer, _Struct):
                                    mesos_id=launchy.container_id)
         state.push()
         lk_l = state.lock("launch", LOCK_EX)
-        # We ignore the executor_info in the Launch message for now but in the
-        # future it will mean something.
         state.executor_id = launchy.executor_id
         state.push()
         state.ids()
