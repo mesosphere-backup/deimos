@@ -127,8 +127,10 @@ class Docker(Containerizer, _Struct):
         # start an executor.
         observer_argv = None
         if launchy.needs_observer:
-            observer_argv = [ mesos_executor(),
-                              deimos.path.me(), "wait", "--docker" ]
+            # NB: The "@@docker@@" variant is a work around for Mesos's option
+            # parser. There is a fix in the pipeline.
+            observer_argv = [ mesos_executor(), "--override",
+                              deimos.path.me(), "wait", "@@docker@@" ]
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
@@ -219,7 +221,9 @@ class Docker(Containerizer, _Struct):
         return 0
     def wait(self, *args):
         log.info(" ".join(args))
-        if list(args[0:1]) == ["--docker"]:
+        # NB: The "@@docker@@" variant is a work around for Mesos's option
+        # parser. There is a fix in the pipeline.
+        if list(args[0:1]) in [ ["--docker"], ["@@docker@@"] ]:
             # In Docker mode, we use Docker wait to wait for the container
             # and then exit with the returned exit code. The Docker CID is
             # passed on the command line.
