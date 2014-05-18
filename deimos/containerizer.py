@@ -12,11 +12,11 @@ import sys
 import time
 
 try:                  # Prefer system installation of Mesos protos if available
-    import mesos_pb2 as protos
-    import containerizer_pb2 as protos
+    from mesos_pb2 import *
+    from containerizer_pb2 import *
 except:
-    import deimos.mesos_pb2 as protos
-    import deimos.containerizer_pb2 as protos
+    from deimos.mesos_pb2 import *
+    from deimos.containerizer_pb2 import *
 
 import deimos.cgroups
 from deimos.cmd import Run
@@ -80,7 +80,7 @@ class Docker(Containerizer, _Struct):
         fork = False if "--no-fork" in args else True
         deimos.sig.install(self.log_signal)
         run_options = []
-        proto = recordio.read(protos.Launch)
+        proto = recordio.read(Launch)
         launchy = deimos.mesos.Launch(proto)
         state = deimos.state.State(self.state_root,
                                    mesos_id=launchy.container_id)
@@ -172,27 +172,24 @@ class Docker(Containerizer, _Struct):
                                                           stdout=obs_out,
                                                           stderr=obs_err,
                                                           close_fds=True)
-#                   else:
-#                       if fork:
-#                           pid = os.fork()
-#                           if pid is not 0:
-#                               state.ids()
-#                               log.info("Forking watcher into child...")
-#                               return 1
         data = Run(data=True)(deimos.docker.wait(state.cid()))
         state.exit(data)
         lk_w.unlock()
         for p, arr in [(self.runner, runner_argv), (observer, observer_argv)]:
-            if p is None or p.wait() == 0:
+            if p is None:
                 continue
-            log.warning(deimos.cmd.present(arr, p.wait()))
+            msg = log.info(deimos.cmd.present(arr, p.wait()))
+            if p.wait() == 0:
+                log.info(msg)
+            else:
+                log.warning(msg)
         return state.exit()
     def update(self, *args):
         log.info(" ".join(args))
         log.info("Update is a no-op for Docker...")
     def usage(self, *args):
         log.info(" ".join(args))
-        message = recordio.read(protos.Usage)
+        message = recordio.read(Usage)
         container_id = message.container_id.value
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.await_launch()
@@ -208,7 +205,7 @@ class Docker(Containerizer, _Struct):
             log.info("Container has no CGroups...already stopped?")
             return 0
         try:
-            recordio.write(protos.ResourceStatistics,
+            recordio.write(ResourceStatistics,
                            timestamp             = time.time(),
                            mem_limit_bytes       = cg.memory.limit(),
                            cpus_limit            = cg.cpu.limit(),
@@ -229,7 +226,7 @@ class Docker(Containerizer, _Struct):
             # passed on the command line.
             state = deimos.state.State(self.state_root, docker_id=args[1])
         else:
-            message = recordio.read(protos.Wait)
+            message = recordio.read(Wait)
             container_id = message.container_id.value
             state = deimos.state.State(self.state_root, mesos_id=container_id)
         self.state = state
@@ -241,7 +238,7 @@ class Docker(Containerizer, _Struct):
             if e.errno != errno.EINTR:
                 raise e
             state.lock("wait", LOCK_SH, 1)
-        recordio.write(protos.Termination,
+        recordio.write(Termination,
                        killed  = False,
                        message = "",
                        status  = (state.exit() or 255))
@@ -250,7 +247,7 @@ class Docker(Containerizer, _Struct):
         raise Err("Wait lock is not held nor is exit file present")
     def destroy(self, *args):
         log.info(" ".join(args))
-        message = recordio.read(protos.Destroy)
+        message = recordio.read(Destroy)
         container_id = message.container_id.value
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.await_launch()
