@@ -153,6 +153,12 @@ class Docker(Containerizer, _Struct):
                     state.push()
                     lk_w = state.lock("wait", LOCK_EX)
                     lk_l.unlock()
+                    if fork:
+                        pid = os.fork()
+                        if pid is not 0:
+                            state.ids()
+                            log.info("Forking watcher into child...")
+                            return
                     state.ids()
                     if observer_argv is not None:
                         observer_argv += [state.cid()]
