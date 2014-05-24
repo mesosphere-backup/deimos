@@ -26,6 +26,8 @@ class LaunchProto(object):
     def __init__(self, proto):
         self.proto = proto
     def executor(self):
+        if self.proto.HasField("task_info"):
+            return None
         if self.proto.HasField("executor_info"):
             return self.proto.executor_info
         if self.proto.task_info.HasField("executor"):
@@ -42,10 +44,10 @@ class LaunchProto(object):
         return "docker:///", []
     def resources(self):
         # NB: We only want the executor resources when there is no task.
-        if self.proto.HasField("executor_info"):
-            return self.executor().resources
-        else:
+        if self.proto.HasField("task_info"):
             return self.proto.task_info.resources
+        else:
+            return self.executor().resources
     def executor_id(self):
         if self.executor() is not None:
             return self.executor().executor_id.value
