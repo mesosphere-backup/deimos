@@ -178,7 +178,7 @@ class Docker(Containerizer, _Struct):
         for p, arr in [(self.runner, runner_argv), (observer, observer_argv)]:
             if p is None:
                 continue
-            msg = log.info(deimos.cmd.present(arr, p.wait()))
+            msg = deimos.cmd.present(arr, p.wait())
             if p.wait() == 0:
                 log.info(msg)
             else:
