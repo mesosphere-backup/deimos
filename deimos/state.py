@@ -91,10 +91,9 @@ class State(_Struct):
     def exit(self, value=None):
         if value is not None:
             self._writef("exit", str(value))
-        else:
-            data = self._readf("exit")
-            if data is not None:
-                return deimos.docker.read_wait_code(data)
+        data = self._readf("exit")
+        if data is not None:
+            return deimos.docker.read_wait_code(data)
     def push(self):
         self._mkdir()
         properties = [("cid", self.docker_id),
@@ -136,6 +135,7 @@ class State(_Struct):
         f = self.resolve(path)
         with open(f, "w+") as h:
             h.write(value + "\n")
+            h.flush()
     def _docker(self, path=None, mkdir=False):
         if path is None:
             p = os.path.join(self.root, "docker", self.docker_id)

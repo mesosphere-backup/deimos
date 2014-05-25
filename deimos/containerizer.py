@@ -238,10 +238,11 @@ class Docker(Containerizer, _Struct):
             if e.errno != errno.EINTR:
                 raise e
             state.lock("wait", LOCK_SH, 1)
+        termination = (state.exit() if state.exit() is not None else 64) << 8
         recordio.write(Termination,
                        killed  = False,
                        message = "",
-                       status  = (state.exit() or 255))
+                       status  = termination)
         if state.exit() is not None:
             return state.exit()
         raise Err("Wait lock is not held nor is exit file present")
