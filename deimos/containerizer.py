@@ -157,7 +157,7 @@ class Docker(Containerizer, _Struct):
                     if observer_argv is not None:
                         observer_argv += [state.cid()]
                         log.info(deimos.cmd.present(observer_argv))
-                        call = deimos.cmd.in_sh(observer_argv)
+                        call = deimos.cmd.in_sh(observer_argv, allstderr=False)
                         # TODO: Collect these leaking file handles.
                         obs_out = open(state.resolve("observer.out"), "w+")
                         obs_err = open(state.resolve("observer.err"), "w+")
