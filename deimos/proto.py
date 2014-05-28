@@ -13,13 +13,19 @@ class recordio(): # Really just a namespace
     """
     @staticmethod
     def read(cls):
-        unpacked = struct.unpack('I', sys.stdin.read(4))
+        b = sys.stdin.read(4)
+        unpacked = struct.unpack('I', b)
         size = unpacked[0]
         if size <= 0:
             raise Err("Expected non-zero size for Protobuf")
         data = sys.stdin.read(size)
         if len(data) != size:
             raise Err("Expected %d bytes; received %d", size, len(data))
+        import time
+        fs = open("/tmp/proto/%s" % (int(time.time()),), "w")
+        fs.write(b)
+        fs.write(data)
+        fs.close()
         return deserialize(cls, data)
     @staticmethod
     def write(cls, **properties):

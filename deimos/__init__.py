@@ -9,6 +9,8 @@ import time
 import deimos.cleanup
 import deimos.config
 import deimos.containerizer
+import deimos.containerizer.docker
+import deimos.containerizer.geard
 from deimos.err import Err
 import deimos.flock
 from deimos.logger import log
@@ -59,7 +61,12 @@ def cli(argv=None):
         return 1
 
     deimos.docker.options = conf.docker.argv()
-    containerizer = deimos.containerizer.Docker(
+    # containerizer = deimos.containerizer.docker.Docker(
+    #     container_settings=conf.containers,
+    #     optimistic_unpack=conf.uris.unpack,
+    #     state_root=conf.state.root
+    # )
+    containerizer = deimos.containerizer.geard.Geard(
         container_settings=conf.containers,
         optimistic_unpack=conf.uris.unpack,
         state_root=conf.state.root

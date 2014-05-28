@@ -42,6 +42,11 @@ def initialize(console=logging.DEBUG, syslog=logging.INFO):
         logger.setFormatter(logging.Formatter(fmt=fmt))
         logger.setLevel(syslog)
         root.addHandler(logger)
+
+        logger = logging.FileHandler("/tmp/deimos.log")
+        logger.setFormatter(logging.Formatter(fmt=fmt))
+        logger.setLevel(syslog)
+        root.addHandler(logger)
     root.removeHandler(_null_handler)
 
 def logger(height=1):                 # http://stackoverflow.com/a/900404/48251

@@ -12,6 +12,8 @@ names = dict((getattr(signal, s), s) for s in dir(signal) if is_signal_name(s))
 def install(f, signals=[signal.SIGINT, signal.SIGTERM]):
     log = deimos.logger.logger(2)
     def handler(signum, _):
+        import sys
+        log.error(sys.argv)
         log.warning("%s (%d)", names.get(signum, "SIG???"), signum)
         response = f(signum)
         if type(response) == Resume:
