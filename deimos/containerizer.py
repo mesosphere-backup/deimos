@@ -181,9 +181,17 @@ class Docker(Containerizer, _Struct):
         data = Run(data=True)(deimos.docker.wait(state.cid()))
         state.exit(data)
         lk_w.unlock()
+        time.sleep(0.01)
         for p, arr in [(self.runner, runner_argv), (observer, observer_argv)]:
             if p is None:
                 continue
+            if p.poll() is None:
+                log.warning(deimos.cmd.present(arr, "Overdue -> SIGTERM"))
+                p.terminate()
+                time.sleep(0.01)
+            if p.poll() is None:
+                log.warning(deimos.cmd.present(arr, "Overdue -> SIGKILL"))
+                p.kill()
             msg = deimos.cmd.present(arr, p.wait())
             if p.wait() == 0:
                 log.info(msg)
