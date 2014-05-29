@@ -50,11 +50,12 @@ class Run(_Struct):
             self.log.log(self.error_level, "STDERR // " + err)
         raise subprocess.CalledProcessError(code, argv)
 
-def present(argv, exit=None):
-    if exit is not None:
-        return "exit %d // %s" % (exit, escape(argv))
-    else:
-        return "call // %s" % escape(argv)
+def present(argv, token=None):
+    if isinstance(token, basestring):
+        return "%s // %s" % (token, escape(argv))
+    if isinstance(token, int):
+        return "exit %d // %s" % (token, escape(argv))
+    return "call // %s" % escape(argv)
 
 def escape(argv):
     # NB: The pipes.quote() function is deprecated in Python 3
