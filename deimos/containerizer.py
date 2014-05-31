@@ -130,7 +130,22 @@ class Docker(Containerizer, _Struct):
             # NB: The "@@docker@@" variant is a work around for Mesos's option
             # parser. There is a fix in the pipeline.
             observer_argv = [ mesos_executor(), "--override",
-                              deimos.path.me(), "wait", "@@docker@@" ]
+                              deimos.path.me(), "wait", "@@observe-docker@@" ]
+            state.lock("observe", LOCK_EX|LOCK_NB) ####### Explanation of Locks
+            # When the observer is running, we would like it's call to wait()
+            # to finish before all others; and we'd like the observer to have
+            # a chance to report TASK_FINISHED before the calls to wait()
+            # report their results (which would result in a TASK_FAILED).
+            #
+            # For this reason, we take the "observe" lock in launch(), before
+            # we call the observer and before releasing the "launch" or "wait"
+            # locks.
+            #
+            # Calls to wait() in observer mode will actually skip locking
+            # "observe"; but other wait calls must take this lock. The
+            # "observe" lock is held by launch() until the observer executor
+            # completes, at which point we can be reasonably sure its status
+            # was propagated to the Mesos slave.
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
@@ -185,13 +200,6 @@ class Docker(Containerizer, _Struct):
         for p, arr in [(self.runner, runner_argv), (observer, observer_argv)]:
             if p is None:
                 continue
-            if p.poll() is None:
-                log.warning(deimos.cmd.present(arr, "Overdue -> SIGTERM"))
-                p.terminate()
-                time.sleep(0.01)
-            if p.poll() is None:
-                log.warning(deimos.cmd.present(arr, "Overdue -> SIGKILL"))
-                p.kill()
             msg = deimos.cmd.present(arr, p.wait())
             if p.wait() == 0:
                 log.info(msg)
@@ -232,13 +240,15 @@ class Docker(Containerizer, _Struct):
         return 0
     def wait(self, *args):
         log.info(" ".join(args))
-        # NB: The "@@docker@@" variant is a work around for Mesos's option
-        # parser. There is a fix in the pipeline.
-        if list(args[0:1]) in [ ["--docker"], ["@@docker@@"] ]:
+        observe = False
+        # NB: The "@@observe-docker@@" variant is a work around for Mesos's
+        #     option parser. There is a fix in the pipeline.
+        if list(args[0:1]) in [ ["--observe-docker"], ["@@observe-docker@@"] ]:
             # In Docker mode, we use Docker wait to wait for the container
             # and then exit with the returned exit code. The Docker CID is
             # passed on the command line.
             state = deimos.state.State(self.state_root, docker_id=args[1])
+            observe = True
         else:
             message = recordio.read(Wait)
             container_id = message.container_id.value
@@ -247,11 +257,15 @@ class Docker(Containerizer, _Struct):
         deimos.sig.install(self.stop_docker_and_resume)
         state.await_launch()
         try:
+            if not observe:
+                state.lock("observe", LOCK_SH, seconds=None)
             state.lock("wait", LOCK_SH, seconds=None)
         except IOError as e:                       # Allows for signal recovery
             if e.errno != errno.EINTR:
                 raise e
-            state.lock("wait", LOCK_SH, 1)
+            if not observe:
+                state.lock("observe", LOCK_SH, seconds=1)
+            state.lock("wait", LOCK_SH, seconds=1)
         termination = (state.exit() if state.exit() is not None else 64) << 8
         recordio.write(Termination,
                        killed  = False,
