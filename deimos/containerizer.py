@@ -9,6 +9,7 @@ import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 
 try:                  # Prefer system installation of Mesos protos if available
@@ -196,10 +197,19 @@ class Docker(Containerizer, _Struct):
         data = Run(data=True)(deimos.docker.wait(state.cid()))
         state.exit(data)
         lk_w.unlock()
-        time.sleep(0.01)
         for p, arr in [(self.runner, runner_argv), (observer, observer_argv)]:
             if p is None:
                 continue
+            thread = threading.Thread(target=p.wait)
+            thread.start()
+            thread.join(10)
+            if thread.is_alive():
+                log.warning(deimos.cmd.present(arr, "SIGTERM after 10s"))
+                p.terminate()
+            thread.join(1)
+            if thread.is_alive():
+                log.warning(deimos.cmd.present(arr, "SIGKILL after 1s"))
+                p.kill()
             msg = deimos.cmd.present(arr, p.wait())
             if p.wait() == 0:
                 log.info(msg)
