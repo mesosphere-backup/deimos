@@ -100,7 +100,7 @@ class Docker(Containerizer, _Struct):
         # TODO: if launchy.user:
         #           os.seteuid(launchy.user)
         url, options = self.container_settings.override(*launchy.container)
-        pre, image = url.split("docker:///")
+        pre, image = re.split(r"^docker:///?", url)
         if pre != "":
             raise Err("URL '%s' is not a valid docker:// URL!" % url)
         if image == "":
