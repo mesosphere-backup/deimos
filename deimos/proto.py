@@ -27,6 +27,12 @@ class recordio(): # Really just a namespace
         sys.stdout.write(struct.pack('I', len(data)))
         sys.stdout.write(data)
         pass
+    @staticmethod
+    def writeProto(proto):
+        data = proto.SerializeToString()
+        sys.stdout.write(struct.pack('I', len(data)))
+        sys.stdout.write(data)
+        pass
 
 def serialize(cls, **properties):
     """

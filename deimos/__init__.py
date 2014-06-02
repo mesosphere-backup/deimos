@@ -55,6 +55,7 @@ def cli(argv=None):
     if sub not in deimos.containerizer.methods():
         print >>sys.stderr, format_help()
         print >>sys.stderr, "** Please specify a subcommand **".center(79)
+        log.error("Bad ARGV: %r" % argv[1:])
         return 1
 
     deimos.docker.options = conf.docker.argv()

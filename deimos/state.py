@@ -166,6 +166,15 @@ class State(_Struct):
             log.info("mesos  = %s", self.mesos_container_id())
         if self.cid() is not None:
             log.info("docker = %s", self.cid())
+    def exists(self):
+        path = None
+        if self.mesos_id is not None:
+            path = os.path.join(self.root, "mesos", self.mesos_id)
+        if self.docker_id is not None:
+            path = os.path.join(self.root, "docker", self.docker_id)
+        if path is not None:
+            return os.path.exists(path)
+        return False
 
 class CIDTimeout(Err): pass
 

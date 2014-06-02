@@ -42,14 +42,18 @@ class Containerizer(object):
     def usage(self, *args): pass
     def wait(self, *args): pass
     def destroy(self, *args): pass
+    def recover(self, *args): pass
+    def containers(self, *args): pass
     def __call__(self, *args):
         try:
             name   = args[0]
-            method = { "launch"  : self.launch,
-                       "update"  : self.update,
-                       "usage"   : self.usage,
-                       "wait"    : self.wait,
-                       "destroy" : self.destroy }[name]
+            method = { "launch"     : self.launch,
+                       "update"     : self.update,
+                       "usage"      : self.usage,
+                       "wait"       : self.wait,
+                       "destroy"    : self.destroy,
+                       "recover"    : self.recover,
+                       "containers" : self.containers }[name]
         except IndexError:
             raise Err("Please choose a subcommand")
         except KeyError:
@@ -295,6 +299,25 @@ class Docker(Containerizer, _Struct):
             Run()(deimos.docker.stop(state.cid()))
         else:
             log.info("Container is stopped")
+        return 0
+    def containers(self, *args):
+        log.info(" ".join(args))
+        data = Run(data=True)(deimos.docker.docker("ps", "--no-trunc", "-q"))
+        mesos_ids = []
+        for line in data.splitlines():
+            cid = line.strip()
+            state = deimos.state.State(self.state_root, docker_id=cid)
+            if not state.exists():
+                continue
+            try:
+                state.lock("wait", LOCK_SH|LOCK_NB)
+            except deimos.flock.Err:     # LOCK_EX held, so launch() is running
+                mesos_ids += [state.mesos_container_id]
+        containers = Containers()
+        for mesos_id in mesos_ids:
+            container = containers.containers.add()
+            container.value = mesos_id
+        recordio.writeProto(containers)
         return 0
     def log_signal(self, signum):
         pass
