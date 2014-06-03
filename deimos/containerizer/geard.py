@@ -114,7 +114,7 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
         for v in ["LIBPROCESS_PORT", "LIBPROCESS_IP"]:
             if v in os.environ:
                 del os.environ[v]
-        observer = subprocess.Popen(call, close_fds=True)
+        subprocess.Popen(call, close_fds=True)
         return 0
 
     def update(self, *args):
@@ -151,15 +151,17 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
     def wait(self, *args):
         log.info(" ".join(args))
 
-        watcher = False
         if list(args[0:1]) in [ ["--observe-docker"], ["@@observe-docker@@"] ]:
             container_id = args[1]
-            watcher = True
         else:
             message = recordio.read(Wait)
             container_id = message.container_id.value[:23]
 
-        deimos.sig.install(functools.partial(self.halt, container_id))
+        def kill(*args):
+            self.halt(container_id)
+            return deimos.sig.Resume()
+
+        deimos.sig.install(kill)
 
         status = 0
         while True:
@@ -179,12 +181,11 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
 
             time.sleep(STATE_REFRESH)
 
-        log.error("---------%s" % (watcher,))
         recordio.write(Termination,
                        killed  = False,
                        message = "",
-                       status  = status)
-        return status
+                       status  = 64 << 8)
+        return 0
 
     def destroy(self, *args):
         log.info(" ".join(args))
