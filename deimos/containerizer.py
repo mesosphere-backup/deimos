@@ -137,7 +137,7 @@ class Docker(Containerizer, _Struct):
             observer_argv = [ mesos_executor(), "--override",
                               deimos.path.me(), "wait", "@@observe-docker@@" ]
             state.lock("observe", LOCK_EX|LOCK_NB) ####### Explanation of Locks
-            # When the observer is running, we would like it's call to wait()
+            # When the observer is running, we would like its call to wait()
             # to finish before all others; and we'd like the observer to have
             # a chance to report TASK_FINISHED before the calls to wait()
             # report their results (which would result in a TASK_FAILED).
