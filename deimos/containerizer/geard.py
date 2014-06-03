@@ -61,9 +61,8 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
 
     def _docker_cid(self, container_id):
         try:
-            return subprocess.check_output(
-                shlex.split('docker inspect -f "{{.ID}}" %s' % (
-                    container_id, )))[:-1]
+            call = ["docker", "-f", "{{.ID}}", container_id]
+            return deimos.cmd.Run(data=True)(call).strip()
         except subprocess.CalledProcessError:
             return ""
 
