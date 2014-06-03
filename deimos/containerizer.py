@@ -341,7 +341,8 @@ class Docker(Containerizer, _Struct):
 ####################################################### Mesos interface helpers
 
 MESOS_ESSENTIAL_ENV = [ "MESOS_SLAVE_ID",     "MESOS_SLAVE_PID",
-                        "MESOS_FRAMEWORK_ID", "MESOS_EXECUTOR_ID" ]
+                        "MESOS_FRAMEWORK_ID", "MESOS_EXECUTOR_ID",
+                        "MESOS_CHECKPOINT",   "MESOS_RECOVERY_TIMEOUT" ]
 
 def mesos_env():
     env = os.environ.get
