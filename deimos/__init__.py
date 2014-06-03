@@ -61,16 +61,12 @@ def cli(argv=None):
         return 1
 
     deimos.docker.options = conf.docker.argv()
-    # containerizer = deimos.containerizer.docker.Docker(
-    #     container_settings=conf.containers,
-    #     optimistic_unpack=conf.uris.unpack,
-    #     state_root=conf.state.root
-    # )
-    containerizer = deimos.containerizer.geard.Geard(
-        container_settings=conf.containers,
-        optimistic_unpack=conf.uris.unpack,
-        state_root=conf.state.root
-    )
+    containerizer = getattr(deimos.containerizer,
+        conf.containerizer.type).Handler(
+            container_settings=conf.containers,
+            optimistic_unpack=conf.uris.unpack,
+            state_root=conf.state.root
+        )
 
     deimos.usage.report()
     try:

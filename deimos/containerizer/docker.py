@@ -33,7 +33,7 @@ from deimos.proto import recordio
 from deimos._struct import _Struct
 import deimos.state
 
-class Docker(deimos.containerizer.Containerizer, _Struct):
+class Handler(deimos.containerizer.Containerizer, _Struct):
     def __init__(self, workdir="/tmp/mesos-sandbox",
                        state_root="/tmp/deimos",
                        shared_dir="fs",

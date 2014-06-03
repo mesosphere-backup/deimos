@@ -41,7 +41,7 @@ import shlex
 
 STATE_REFRESH = 1
 
-class Geard(deimos.containerizer.Containerizer, _Struct):
+class Handler(deimos.containerizer.Containerizer, _Struct):
     _gear_host = "http://localhost:43273/"
 
     def __init__(self, workdir="/tmp/mesos-sandbox",
@@ -176,7 +176,7 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
         recordio.write(Termination,
                        killed  = False,
                        message = "",
-                       status  = 64 << 8)
+                       status  = 0 << 8)
         return 0
 
     def destroy(self, *args):

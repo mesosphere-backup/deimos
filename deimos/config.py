@@ -18,6 +18,7 @@ def load_configuration(f=None, interactive=sys.stdout.isatty()):
                        containers = Containers(),
                        uris       = URIs(),
                        state      = State(),
+                       containerizer = Containerizer(),
                        log        = Log(
                          console  = logging.DEBUG if interactive     else None,
                          syslog   = logging.INFO  if not interactive else None
@@ -109,6 +110,10 @@ class Containers(_Struct):
     def override(self, image=None, options=[]):
         return self.image.override(image), self.options.override(options)
 
+class Containerizer(_Struct):
+    def __init__(self, type="docker"):
+        _Struct.__init__(self, type=type)
+
 class URIs(_Struct):
     def __init__(self, unpack=True):
         _Struct.__init__(self, unpack=coercebool(unpack))
@@ -144,6 +149,7 @@ def parse(f):
     config.read(f)
     parsed = {}
     sections = [("log", Log), ("state", State), ("uris", URIs),
+                ("containerizer",      Containerizer),
                 ("docker",             Docker),
                 ("docker.index",       DockerIndex),
                 ("containers.image",   Image),
