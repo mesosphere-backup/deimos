@@ -59,7 +59,7 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
                                runner=None,
                                state=None)
 
-    def _cid(self, container_id):
+    def _docker_cid(self, container_id):
         try:
             return subprocess.check_output(
                 shlex.split('docker inspect -f "{{.ID}}" %s' % (
@@ -67,46 +67,24 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
         except subprocess.CalledProcessError:
             return ""
 
-    def watch_observer(self, observer):
-        thread = threading.Thread(target=observer.wait)
-        thread.start()
-        thread.join(10)
+    def _id(self, cls):
+        msg = recordio.read(cls)
+        return msg.container_id.value[:23]
 
-    # TODO: check for geard running first
-    def launch(self, *args):
-        log.info(" ".join(args))
+    def _container(self, id, image):
+        requests.put(urlparse.urljoin(
+            self._gear_host, "/container/%s" % (id,)),
+            headers={ "Content-Type": "application/json" },
+            data=json.dumps({ "Image": image, "Started": True }))
 
-        proto = recordio.read(Launch)
-        launchy = deimos.mesos.Launch(proto)
-        log.error(launchy)
-
-        if launchy.directory:
-            os.chdir(launchy.directory)
-
-        deimos.containerizer.place_uris(launchy, self.shared_dir,
-            self.optimistic_unpack)
-
-
-        container_id = launchy.container_id[:23]
-        resp = requests.put(urlparse.urljoin(
-            self._gear_host, "/container/%s" % (container_id,)),
-            headers={
-                "Content-Type": "application/json"
-            }, data=json.dumps({
-                "Image": self._image(launchy),
-                "Started": True
-            }))
-        log.error(resp.content)
-
+    def _observer(self, id):
         observer_argv = [ deimos.containerizer.mesos_executor(), "--override",
-                              deimos.path.me(), "wait", "@@observe-docker@@" ]
+            deimos.path.me(), "wait", "@@observe-geard@@", id ]
 
-        observer_argv += [container_id]
+        log.error(observer_argv)
         log.info(deimos.cmd.present(observer_argv))
         call = deimos.cmd.in_sh(observer_argv, allstderr=False)
 
-
-        log.error(call)
         # If the Mesos executor sees LIBPROCESS_PORT=0 (which
         # is passed by the slave) there are problems when it
         # attempts to bind. ("Address already in use").
@@ -115,6 +93,23 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
             if v in os.environ:
                 del os.environ[v]
         subprocess.Popen(call, close_fds=True)
+
+    # TODO: check for geard running first
+    def launch(self, *args):
+        log.info(" ".join(args))
+
+        proto = recordio.read(Launch)
+        launchy = deimos.mesos.Launch(proto)
+
+        deimos.containerizer.place_uris(launchy, self.shared_dir,
+            self.optimistic_unpack)
+
+        container_id = launchy.container_id[:23]
+
+        self._container(container_id, self._image(launchy))
+
+        self._observer(container_id)
+
         return 0
 
     def update(self, *args):
@@ -123,11 +118,11 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
 
     def usage(self, *args):
         log.info(" ".join(args))
-        message = recordio.read(Usage)
-        container_id = message.container_id.value[:23]
 
-        docker_cid = self._cid(container_id)
-        if docker_cid == "":
+        id = self._id(Usage)
+
+        docker_cid = self._docker_cid(id)
+        if id == "":
             log.info("Container not running?")
             return 0
 
@@ -148,37 +143,34 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
             raise e
         return 0
 
+    def _status(self, id):
+        resp = requests.get(urlparse.urljoin(self._gear_host, "/containers"))
+
+        state = [x for x in resp.json()["Containers"] if x["Id"] == id]
+
+        if len(state) == 0: return False
+        state = state[0]
+
+        if state["ActiveState"] not in ["active", "activating"]:
+            return False
+
+        return True
+
     def wait(self, *args):
         log.info(" ".join(args))
 
-        if list(args[0:1]) in [ ["--observe-docker"], ["@@observe-docker@@"] ]:
-            container_id = args[1]
+        if list(args[0:1]) in [ ["@@observe-geard@@"] ]:
+            id = args[1]
         else:
-            message = recordio.read(Wait)
-            container_id = message.container_id.value[:23]
+            id = self._id(Wait)
 
         def kill(*args):
-            self.halt(container_id)
+            self.halt(id)
             return deimos.sig.Resume()
 
         deimos.sig.install(kill)
 
-        status = 0
-        while True:
-            resp = requests.get(urlparse.urljoin(
-                self._gear_host, "/containers"))
-
-            state = [x for x in resp.json()["Containers"]
-                if x["Id"] == container_id]
-
-            if len(state) == 0:
-                break
-            state = state[0]
-
-            if state["ActiveState"] not in ["active", "activating"]:
-                status = 1
-                break
-
+        while self._status(id):
             time.sleep(STATE_REFRESH)
 
         recordio.write(Termination,
@@ -189,24 +181,14 @@ class Geard(deimos.containerizer.Containerizer, _Struct):
 
     def destroy(self, *args):
         log.info(" ".join(args))
-        message = recordio.read(Destroy)
-        container_id = message.container_id.value[:23]
 
-        self.halt(container_id)
+        self.halt(self._id(Destroy))
 
         return 0
 
     def halt(self, id, *args):
         resp = requests.delete(urlparse.urljoin(
             self._gear_host, "/container/%s" % (id,)))
-
-    def default_image(self, launchy):
-        opts = dict(self.index_settings.items(onlyset=True))
-        if "account_libmesos" in opts:
-            if not launchy.needs_observer:
-                opts["account"] = opts["account_libmesos"]
-            del opts["account_libmesos"]
-        return deimos.docker.matching_image_for_host(**opts)
 
     def containers(self, *args):
         log.info(" ".join(args))

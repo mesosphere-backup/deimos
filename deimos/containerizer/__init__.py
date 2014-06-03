@@ -61,6 +61,13 @@ class Containerizer(object):
         else:
             log.warning(msg)
 
+    def default_image(self, launchy):
+        opts = dict(self.index_settings.items(onlyset=True))
+        if "account_libmesos" in opts:
+            if not launchy.needs_observer:
+                opts["account"] = opts["account_libmesos"]
+            del opts["account_libmesos"]
+        return deimos.docker.matching_image_for_host(**opts)
 
 def methods():
     "Names of operations provided by containerizers, as a set."
