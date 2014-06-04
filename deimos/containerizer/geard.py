@@ -33,6 +33,7 @@ from deimos._struct import _Struct
 import deimos.state
 import deimos.sig
 
+import itertools
 import functools
 import json
 import requests
@@ -61,7 +62,7 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
 
     def _docker_cid(self, container_id):
         try:
-            call = ["docker", "-f", "{{.ID}}", container_id]
+            call = ["docker", "inspect", "-f", "{{.ID}}", container_id]
             return deimos.cmd.Run(data=True)(call).strip()
         except subprocess.CalledProcessError:
             return ""
@@ -70,11 +71,16 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
         msg = recordio.read(cls)
         return msg.container_id.value[:23]
 
-    def _container(self, id, image):
+    def _container(self, id, image, ports):
+        req = { "Image": image, "Started": True }
+        if len(ports) != 0:
+            req["publicports"] = [
+                { "internal": i, "external": e} for e,i in ports]
+
         requests.put(urlparse.urljoin(
             self._gear_host, "/container/%s" % (id,)),
             headers={ "Content-Type": "application/json" },
-            data=json.dumps({ "Image": image, "Started": True }))
+            data=json.dumps(req))
 
     def _observer(self, id):
         observer_argv = [ deimos.containerizer.mesos_executor(), "--override",
@@ -105,7 +111,11 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
 
         container_id = launchy.container_id[:23]
 
-        self._container(container_id, self._image(launchy))
+        image = self._image(launchy)
+        ports = list(itertools.izip_longest(launchy.ports,
+            deimos.docker.inner_ports(image)))
+
+        self._container(container_id, image, ports)
 
         self._observer(container_id)
 
