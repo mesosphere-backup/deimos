@@ -39,6 +39,7 @@ import json
 import requests
 import urlparse
 import shlex
+import glob
 
 STATE_REFRESH = 1
 
@@ -125,6 +126,11 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
         log.info(" ".join(args))
         log.info("Update is a no-op for Docker...")
 
+
+    def cgroups(self, cid):
+        paths = glob.glob("/sys/fs/cgroup/*/*/docker-%s.scope" % (cid,))
+        return dict( (s.split("/")[4], s) for s in paths )
+
     def usage(self, *args):
         log.info(" ".join(args))
 
@@ -135,7 +141,7 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
             log.info("Container not running?")
             return 0
 
-        cg = deimos.cgroups.CGroups(**deimos.docker.cgroups(docker_cid))
+        cg = deimos.cgroups.CGroups(**self.cgroups(docker_cid))
         if len(cg.keys()) == 0:
             log.info("Container has no CGroups...already stopped?")
             return 0
