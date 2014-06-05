@@ -21,6 +21,8 @@ develop-eggs
 lib
 lib64
 __pycache__
+*.rpm
+*.deb
 
 # Installer logs
 pip-log.txt
@@ -37,3 +39,6 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+# Packaging
+toor
