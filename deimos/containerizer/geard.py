@@ -161,6 +161,10 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
     def _status(self, id):
         resp = requests.get(urlparse.urljoin(self._gear_host, "/containers"))
 
+        # Minor hiccup in geard, retry again
+        if resp.status_code == 503:
+            return True
+
         state = [x for x in resp.json()["Containers"] if x["Id"] == id]
 
         if len(state) == 0: return False

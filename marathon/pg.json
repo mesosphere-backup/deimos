@@ -1,0 +1,12 @@
+{
+    "container": {
+        "image": "docker:///zaiste/postgresql",
+        "options": [ ]
+    },
+    "id": "postgresql",
+    "instances": "1",
+    "cpus": "1",
+    "mem": "512",
+    "uris": [ ],
+    "ports": [ "5432" ]
+}
