@@ -1,8 +1,8 @@
 {
     "container": {
-        "image": "docker:///zaiste/postgresql"
+        "image": "docker:///mrunalp/fedora-redis"
     },
-    "id": "postgresql",
+    "id": "redis",
     "instances": "1",
     "cpus": "1",
     "mem": "512",

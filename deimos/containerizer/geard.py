@@ -72,16 +72,16 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
         msg = recordio.read(cls)
         return msg.container_id.value[:23]
 
-    def _container(self, id, image, ports):
-        req = { "Image": image, "Started": True }
-        if len(ports) != 0:
-            req["publicports"] = [
-                { "internal": i, "external": e} for e,i in ports]
+    def _container(self, id, image, opts, ports):
+        call = [ "gear", "install", "--start=true" ]
+        call += opts
 
-        requests.put(urlparse.urljoin(
-            self._gear_host, "/container/%s" % (id,)),
-            headers={ "Content-Type": "application/json" },
-            data=json.dumps(req))
+        if len(ports) != 0:
+            cmd_ports = ["%s:%s" % (i, e) for e, i in ports]
+            call += [ "-p", ','.join(cmd_ports) ]
+
+        call += [ image, id ]
+        deimos.cmd.Run(data=True)(call)
 
     def _observer(self, id):
         observer_argv = [ deimos.containerizer.mesos_executor(), "--override",
@@ -115,8 +115,9 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
         image = self._image(launchy)
         ports = list(itertools.izip_longest(launchy.ports,
             deimos.docker.inner_ports(image)))
+        opts = launchy.container[1] if len(launchy.container) > 0 else []
 
-        self._container(container_id, image, ports)
+        self._container(container_id, image, opts, ports)
 
         self._observer(container_id)
 
