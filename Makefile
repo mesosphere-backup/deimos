@@ -36,6 +36,8 @@ clean:
 	rm -rf build
 	sudo rm -rf $(tmp)
 
-.PHONY: clean
-prep:
+.PHONY: prep-ubuntu
+prep-ubuntu:
+	sudo apt-get install ruby-dev python-pip python-dev libz-dev protobuf-compiler
+	sudo gem install fpm
 	sudo pip install bbfreeze
