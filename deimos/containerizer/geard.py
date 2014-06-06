@@ -77,7 +77,7 @@ class Handler(deimos.containerizer.Containerizer, _Struct):
         call += opts
 
         if len(ports) != 0:
-            cmd_ports = ["%s:%s" % (i, e) for e, i in ports]
+            cmd_ports = ["%s:%s" % (i, e or 0) for e, i in ports]
             call += [ "-p", ','.join(cmd_ports) ]
 
         call += [ image, id ]
