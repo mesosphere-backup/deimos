@@ -18,6 +18,9 @@ rpm: clean freeze
 		-n deimos -v `cat ../deimos/VERSION` -p ../deimos.rpm .
 
 # You will have to install bbfreeze to create a package `pip install bbfreeze`
+# Prep:
+# - echo "0.2.3" > deimos/VERSION
+# - sudo python setup.py develop
 .PHONY: freeze
 freeze:
 	mkdir -p toor/$(prefix)/bin
