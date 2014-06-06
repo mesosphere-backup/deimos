@@ -41,7 +41,7 @@ import urlparse
 import shlex
 import glob
 
-STATE_REFRESH = 1
+STATE_REFRESH = 5
 
 class Handler(deimos.containerizer.Containerizer, _Struct):
     _gear_host = "http://localhost:43273/"
