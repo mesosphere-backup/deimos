@@ -312,7 +312,7 @@ class Docker(Containerizer, _Struct):
             try:
                 state.lock("wait", LOCK_SH|LOCK_NB)
             except deimos.flock.Err:     # LOCK_EX held, so launch() is running
-                mesos_ids += [state.mesos_container_id]
+                mesos_ids += [state.mesos_container_id()]
         containers = Containers()
         for mesos_id in mesos_ids:
             container = containers.containers.add()
