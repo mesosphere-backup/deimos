@@ -9,6 +9,7 @@ import time
 import deimos.cleanup
 import deimos.config
 import deimos.containerizer
+import deimos.containerizer.docker
 from deimos.err import Err
 import deimos.flock
 from deimos.logger import log
@@ -59,7 +60,7 @@ def cli(argv=None):
         return 1
 
     deimos.docker.options = conf.docker.argv()
-    containerizer = deimos.containerizer.Docker(
+    containerizer = deimos.containerizer.docker.Docker(
         container_settings=conf.containers,
         optimistic_unpack=conf.uris.unpack,
         state_root=conf.state.root
@@ -67,7 +68,7 @@ def cli(argv=None):
 
     deimos.usage.report()
     try:
-        result = containerizer(*argv[1:])
+        result = deimos.containerizer.stdio(containerizer, *argv[1:])
         deimos.usage.report()
         if result is not None:
             if isinstance(result, int):

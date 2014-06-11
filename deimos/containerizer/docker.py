@@ -1,7 +1,6 @@
 import base64
 import errno
 from fcntl import LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN
-import inspect
 import logging
 import os
 import random
@@ -22,7 +21,7 @@ except:
 import deimos.cgroups
 from deimos.cmd import Run
 import deimos.config
-import deimos.containerizer
+from deimos.containerizer import *
 import deimos.docker
 from deimos.err import Err
 import deimos.logger
@@ -34,36 +33,6 @@ from deimos._struct import _Struct
 import deimos.state
 import deimos.sig
 
-
-class Containerizer(object):
-    def __init__(self): pass
-    def launch(self, *args): pass
-    def update(self, *args): pass
-    def usage(self, *args): pass
-    def wait(self, *args): pass
-    def destroy(self, *args): pass
-    def recover(self, *args): pass
-    def containers(self, *args): pass
-    def __call__(self, *args):
-        try:
-            name   = args[0]
-            method = { "launch"     : self.launch,
-                       "update"     : self.update,
-                       "usage"      : self.usage,
-                       "wait"       : self.wait,
-                       "destroy"    : self.destroy,
-                       "recover"    : self.recover,
-                       "containers" : self.containers }[name]
-        except IndexError:
-            raise Err("Please choose a subcommand")
-        except KeyError:
-            raise Err("Subcommand %s is not valid for containerizers" % name)
-        return method(*args[1:])
-
-def methods():
-    "Names of operations provided by containerizers, as a set."
-    pairs = inspect.getmembers(Containerizer, predicate=inspect.ismethod)
-    return set( k for k, _ in pairs if k[0:1] != "_" )
 
 class Docker(Containerizer, _Struct):
     def __init__(self, workdir="/tmp/mesos-sandbox",
@@ -80,13 +49,12 @@ class Docker(Containerizer, _Struct):
                                index_settings=index_settings,
                                runner=None,
                                state=None)
-    def launch(self, *args):
+    def launch(self, launch_pb, *args):
         log.info(" ".join(args))
         fork = False if "--no-fork" in args else True
         deimos.sig.install(self.log_signal)
         run_options = []
-        proto = recordio.read(Launch)
-        launchy = deimos.mesos.Launch(proto)
+        launchy = deimos.mesos.Launch(launch_pb)
         state = deimos.state.State(self.state_root,
                                    mesos_id=launchy.container_id)
         state.push()
@@ -135,7 +103,7 @@ class Docker(Containerizer, _Struct):
             # NB: The "@@docker@@" variant is a work around for Mesos's option
             # parser. There is a fix in the pipeline.
             observer_argv = [ mesos_executor(), "--override",
-                              deimos.path.me(), "wait", "@@observe-docker@@" ]
+                              deimos.path.me(), "observe" ]
             state.lock("observe", LOCK_EX|LOCK_NB) ####### Explanation of Locks
             # When the observer is running, we would like its call to wait()
             # to finish before all others; and we'd like the observer to have
@@ -220,13 +188,12 @@ class Docker(Containerizer, _Struct):
             else:
                 log.warning(msg)
         return state.exit()
-    def update(self, *args):
+    def update(self, update_pb, *args):
         log.info(" ".join(args))
         log.info("Update is a no-op for Docker...")
-    def usage(self, *args):
+    def usage(self, usage_pb, *args):
         log.info(" ".join(args))
-        message = recordio.read(Usage)
-        container_id = message.container_id.value
+        container_id = usage_pb.container_id.value
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.await_launch()
         state.ids()
@@ -252,33 +219,35 @@ class Docker(Containerizer, _Struct):
             log.error("Missing CGroup!")
             raise e
         return 0
-    def wait(self, *args):
+    def observe(self, *args):
         log.info(" ".join(args))
-        observe = False
-        # NB: The "@@observe-docker@@" variant is a work around for Mesos's
-        #     option parser. There is a fix in the pipeline.
-        if list(args[0:1]) in [ ["--observe-docker"], ["@@observe-docker@@"] ]:
-            # In Docker mode, we use Docker wait to wait for the container
-            # and then exit with the returned exit code. The Docker CID is
-            # passed on the command line.
-            state = deimos.state.State(self.state_root, docker_id=args[1])
-            observe = True
-        else:
-            message = recordio.read(Wait)
-            container_id = message.container_id.value
-            state = deimos.state.State(self.state_root, mesos_id=container_id)
+        state = deimos.state.State(self.state_root, docker_id=args[0])
         self.state = state
         deimos.sig.install(self.stop_docker_and_resume)
         state.await_launch()
-        try:
-            if not observe:
-                state.lock("observe", LOCK_SH, seconds=None)
+        try: # Take the wait lock to block calls to wait()
             state.lock("wait", LOCK_SH, seconds=None)
         except IOError as e:                       # Allows for signal recovery
             if e.errno != errno.EINTR:
                 raise e
-            if not observe:
-                state.lock("observe", LOCK_SH, seconds=1)
+            state.lock("wait", LOCK_SH, seconds=1)
+        if state.exit() is not None:
+            return state.exit()
+        raise Err("Wait lock is not held nor is exit file present")
+    def wait(self, wait_pb, *args):
+        log.info(" ".join(args))
+        container_id = wait_pb.container_id.value
+        state = deimos.state.State(self.state_root, mesos_id=container_id)
+        self.state = state
+        deimos.sig.install(self.stop_docker_and_resume)
+        state.await_launch()
+        try: # Wait for the observe lock so observe completes first
+            state.lock("observe", LOCK_SH, seconds=None)
+            state.lock("wait", LOCK_SH, seconds=None)
+        except IOError as e:                       # Allows for signal recovery
+            if e.errno != errno.EINTR:
+                raise e
+            state.lock("observe", LOCK_SH, seconds=1)
             state.lock("wait", LOCK_SH, seconds=1)
         termination = (state.exit() if state.exit() is not None else 64) << 8
         recordio.write(Termination,
@@ -288,7 +257,7 @@ class Docker(Containerizer, _Struct):
         if state.exit() is not None:
             return state.exit()
         raise Err("Wait lock is not held nor is exit file present")
-    def destroy(self, *args):
+    def destroy(self, destroy_pb, *args):
         log.info(" ".join(args))
         message = recordio.read(Destroy)
         container_id = message.container_id.value
