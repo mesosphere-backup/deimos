@@ -65,6 +65,61 @@ Deimos recognizes Mesos resources that specify ports, CPUs and memory and
 translates them to appropriate Docker options.
 
 
+-----------------------------------
+Passing Parameters through Marathon
+-----------------------------------
+
+Marathon has a REST api to submit JSON-formatted requests to run long-running commands.
+
+From this JSON object, the following keys are used by Deimos:
+
+* ``container`` A nested object with details about what Docker image to run
+
+  * ``image`` What Docker image to run, it may have a custom registry but
+    must have a version tag
+
+  * ``options`` A list of extra options to add to the Docker invocation
+
+* ``cmd`` What command to run with Docker inside the image. Deimos
+  automatically adds ``/bin/sh -c`` to the front
+
+* ``env`` Extra environment variables to pass to the Docker image
+
+* ``cpus`` How many CPU shares to give to the container, can be fractional,
+  gets multiplied by 1024 and added with ``docker run -c``
+
+* ``mem`` How much memory to give to the container, in megabytes
+
+.. code-block:: bash
+
+    curl -v -X POST http://mesos1.it.corp:8080/v2/apps \
+            -H Content-Type:application/json -d '{
+        "id": "marketing",
+        "container": {
+          "image": "docker:///registry.int/marketing:latest",
+          "options": ["-v", "/srv:/srv"]
+        },
+        "cmd": "/webapp/script/start.sh",
+        "env": {"VAR":"VALUE"},
+        "cpus": 2,
+        "mem": 768.0,
+        "instances": 2
+    }'
+
+This turns into a Docker execution line similar to this:
+
+.. code-block:: bash
+
+    docker run --sig-proxy --rm \
+               --cidfile /tmp/deimos/mesos/10330424-95c2-4119-b2a5-df8e1d1eead9/cid \
+               -w /tmp/mesos-sandbox \
+               -v /tmp/deimos/mesos/10330424-95c2-4119-b2a5-df8e1d1eead9/fs:/tmp/mesos-sandbox \
+               -v /srv:/srv -p 31014:3000 \
+               -c 2048 -m 768m \
+               -e PORT=31014 -e PORT0=31014 -e PORTS=31014 -e VAR=VALUE \
+               registry.int/marketing:latest sh -c "/webapp/script/start.sh"
+
+
 -------
 Logging
 -------
