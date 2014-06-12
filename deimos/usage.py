@@ -18,5 +18,5 @@ def children(level=logging.DEBUG):
 def rusage(target=resource.RUSAGE_SELF):
     r = resource.getrusage(target)
     fmt = "rss = %0.03fM  user = %0.03f  sys = %0.03f"
-    return fmt % (r.ru_maxrss / (1024.0 * 1024.0), r.ru_utime, r.ru_stime)
+    return fmt % (r.ru_maxrss / 1024.0, r.ru_utime, r.ru_stime)
 
