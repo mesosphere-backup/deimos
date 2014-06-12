@@ -1,4 +1,3 @@
-import base64
 import errno
 from fcntl import LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN
 import logging
@@ -306,68 +305,4 @@ class Docker(Containerizer, _Struct):
                 opts["account"] = opts["account_libmesos"]
             del opts["account_libmesos"]
         return deimos.docker.matching_image_for_host(**opts)
-
-####################################################### Mesos interface helpers
-
-MESOS_ESSENTIAL_ENV = [ "MESOS_SLAVE_ID",     "MESOS_SLAVE_PID",
-                        "MESOS_FRAMEWORK_ID", "MESOS_EXECUTOR_ID",
-                        "MESOS_CHECKPOINT",   "MESOS_RECOVERY_TIMEOUT" ]
-
-def mesos_env():
-    env = os.environ.get
-    return [ (k, env(k)) for k in MESOS_ESSENTIAL_ENV if env(k) ]
-
-def log_mesos_env(level=logging.INFO):
-    for k, v in os.environ.items():
-        if k.startswith("MESOS_") or k.startswith("LIBPROCESS_"):
-            log.log(level, "%s=%s" % (k, v))
-
-def mesos_directory():
-    if not "MESOS_DIRECTORY" in os.environ: return
-    work_dir = os.path.abspath(os.getcwd())
-    task_dir = os.path.abspath(os.environ["MESOS_DIRECTORY"])
-    if task_dir != work_dir:
-        log.info("Changing directory to MESOS_DIRECTORY=%s", task_dir)
-        os.chdir(task_dir)
-
-def mesos_executor():
-    return os.path.join(os.environ["MESOS_LIBEXEC_DIRECTORY"],
-                        "mesos-executor")
-
-def mesos_default_image():
-    return os.environ.get("MESOS_DEFAULT_CONTAINER_IMAGE")
-
-def place_uris(launchy, directory, optimistic_unpack=False):
-    cmd = deimos.cmd.Run()
-    cmd(["mkdir", "-p", directory])
-    for item in launchy.uris:
-        uri = item.value
-        gen_unpack_cmd = unpacker(uri) if optimistic_unpack else None
-        log.info("Retrieving URI: %s", deimos.cmd.escape([uri]))
-        try:
-            basename = uri.split("/")[-1]
-            f = os.path.join(directory, basename)
-            if basename == "":
-                raise IndexError
-        except IndexError:
-            log.info("Not able to determine basename: %r", uri)
-            continue
-        try:
-            cmd(["curl", "-sSfL", uri, "--output", f])
-        except subprocess.CalledProcessError as e:
-            log.warning("Failed while processing URI: %s",
-                        deimos.cmd.escape(uri))
-            continue
-        if item.executable:
-            os.chmod(f, 0755)
-        if gen_unpack_cmd is not None:
-            log.info("Unpacking %s" % f)
-            cmd(gen_unpack_cmd(f, directory))
-            cmd(["rm", "-f", f])
-
-def unpacker(uri):
-    if re.search(r"[.](t|tar[.])(bz2|xz|gz)$", uri):
-        return lambda f, directory: ["tar", "-C", directory, "-xf", f]
-    if re.search(r"[.]zip$", uri):
-        return lambda f, directory: ["unzip", "-d", directory, f]
 
