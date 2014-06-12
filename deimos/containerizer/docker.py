@@ -258,8 +258,7 @@ class Docker(Containerizer, _Struct):
         raise Err("Wait lock is not held nor is exit file present")
     def destroy(self, destroy_pb, *args):
         log.info(" ".join(args))
-        message = recordio.read(Destroy)
-        container_id = message.container_id.value
+        container_id = destroy_pb.container_id.value
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.await_launch()
         lk_d = state.lock("destroy", LOCK_EX)
