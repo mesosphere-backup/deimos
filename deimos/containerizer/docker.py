@@ -102,22 +102,23 @@ class Docker(Containerizer, _Struct):
             # NB: The "@@docker@@" variant is a work around for Mesos's option
             # parser. There is a fix in the pipeline.
             observer_argv = [ mesos_executor(), "--override",
-                              deimos.path.me(), "observe" ]
+                              deimos.path.me(), "observe", state.mesos_id ]
             state.lock("observe", LOCK_EX|LOCK_NB) ####### Explanation of Locks
-            # When the observer is running, we would like its call to wait()
-            # to finish before all others; and we'd like the observer to have
-            # a chance to report TASK_FINISHED before the calls to wait()
-            # report their results (which would result in a TASK_FAILED).
+            # When the observer is running, we would like its call to
+            # observe() to finish before all the wait(); and we'd like the
+            # observer to have a chance to report TASK_FINISHED before the
+            # calls to wait() report their results (which would result in a
+            # TASK_FAILED).
             #
             # For this reason, we take the "observe" lock in launch(), before
             # we call the observer and before releasing the "launch" or "wait"
             # locks.
             #
-            # Calls to wait() in observer mode will actually skip locking
-            # "observe"; but other wait calls must take this lock. The
-            # "observe" lock is held by launch() until the observer executor
-            # completes, at which point we can be reasonably sure its status
-            # was propagated to the Mesos slave.
+            # Calls to observe() actually skip locking "observe"; but wait()
+            # calls must take this lock. The "observe" lock is held by
+            # launch() until the observer executor completes, at which point
+            # we can be reasonably sure its status was propagated to the Mesos
+            # slave.
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
@@ -148,7 +149,6 @@ class Docker(Containerizer, _Struct):
                             return
                     state.ids()
                     if observer_argv is not None:
-                        observer_argv += [state.cid()]
                         log.info(deimos.cmd.present(observer_argv))
                         call = deimos.cmd.in_sh(observer_argv, allstderr=False)
                         # TODO: Collect these leaking file handles.
@@ -220,7 +220,7 @@ class Docker(Containerizer, _Struct):
         return 0
     def observe(self, *args):
         log.info(" ".join(args))
-        state = deimos.state.State(self.state_root, docker_id=args[0])
+        state = deimos.state.State(self.state_root, mesos_id=args[0])
         self.state = state
         deimos.sig.install(self.stop_docker_and_resume)
         state.await_launch()

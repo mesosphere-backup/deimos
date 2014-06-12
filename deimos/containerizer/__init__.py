@@ -1,6 +1,7 @@
 import inspect
 import logging
 import os
+import re
 
 try:                  # Prefer system installation of Mesos protos if available
     from mesos_pb2 import *
@@ -52,8 +53,8 @@ def stdio(containerizer, *args):
     subcommand:
 
         # Follows a Docker ID, PID, &c and exits with an appropriate, matching
-        # exit code
-        observe <ID>
+        # exit code, in a manner specific to the containerizer
+        observe <id>
 
     """
     try:
