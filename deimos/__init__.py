@@ -71,6 +71,8 @@ def cli(argv=None):
         result = deimos.containerizer.stdio(containerizer, *argv[1:])
         deimos.usage.report()
         if result is not None:
+            if isinstance(result, bool):
+                return 0 if result else 1
             if isinstance(result, int):
                 return result
             if isinstance(result, str):
