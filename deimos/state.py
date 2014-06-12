@@ -48,10 +48,26 @@ class State(_Struct):
         if self.docker_id is None or refresh:
             self.docker_id = self._readf("cid")
         return self.docker_id
+    def is_non(self, flag=None):
+        if flag is True:
+            self._writef("non", "true")
+        return os.path.exists(self.resolve("non"))
     def t(self):
         if self.timestamp is None:
             self.timestamp = self._readf("t")
         return self.timestamp
+    def await_pid(self, seconds=60):
+        base   = 0.05
+        start  = time.time()
+        steps  = [ 1.0, 1.25, 1.6, 2.0, 2.5, 3.2, 4.0, 5.0, 6.4, 8.0 ]
+        scales = ( 10.0 ** n for n in itertools.count() )
+        scaled = ( [scale * step for step in steps] for scale in scales )
+        sleeps = itertools.chain.from_iterable(scaled)
+        log.info("Awaiting PID file: %s", self.resolve("pid"))
+        while not os.path.exists(self.resolve("pid")):
+            time.sleep(next(sleeps))
+            if time.time() - start >= seconds:
+                raise PIDTimeout("No PID file after %ds" % seconds)
     def await_cid(self, seconds=60):
         base   = 0.05
         start  = time.time()
@@ -67,10 +83,16 @@ class State(_Struct):
     def await_launch(self):
         lk_l = self.lock("launch", LOCK_SH)
         self.ids(3)
-        if self.cid() is None:
-            lk_l.unlock()
-            self.await_cid()
-            lk_l = self.lock("launch", LOCK_SH)
+        if self.is_non():
+            if self.pid() is None:
+                lk_l.unlock()
+                self.await_pid()
+                lk_l = self.lock("launch", LOCK_SH)
+        else:
+            if self.cid() is None:
+                lk_l.unlock()
+                self.await_cid()
+                lk_l = self.lock("launch", LOCK_SH)
         return lk_l
     def lock(self, name, flags, seconds=60):
         fmt_time  = "indefinite" if seconds is None else "%ds" % seconds
@@ -177,6 +199,8 @@ class State(_Struct):
         return False
 
 class CIDTimeout(Err): pass
+
+class PIDTimeout(Err): pass
 
 def create(path):
     if not os.path.exists(path):

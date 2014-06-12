@@ -50,6 +50,7 @@ class Docker(Containerizer, _Struct):
                                state=None)
     def launch(self, launch_pb, *args):
         log.info(" ".join(args))
+        non = False
         fork = False if "--no-fork" in args else True
         deimos.sig.install(self.log_signal)
         run_options = []
@@ -67,31 +68,35 @@ class Docker(Containerizer, _Struct):
         # TODO: if launchy.user:
         #           os.seteuid(launchy.user)
         url, options = self.container_settings.override(*launchy.container)
-        pre, image = re.split(r"^docker:///?", url)
-        if pre != "":
-            raise Err("URL '%s' is not a valid docker:// URL!" % url)
-        if image == "":
-            image = self.default_image(launchy)
-        log.info("image  = %s", image)
-        run_options += [ "--sig-proxy" ]
-        run_options += [ "--rm" ]     # This is how we ensure container cleanup
-        run_options += [ "--cidfile", state.resolve("cid") ]
+        if url == "non:///":
+            non = True
+            state.is_non(True)
+        if not non:
+            pre, image = re.split(r"^docker:///?", url)
+            if pre != "":
+                raise Err("URL '%s' is not a valid docker:// URL!" % url)
+            if image == "":
+                image = self.default_image(launchy)
+            log.info("image  = %s", image)
+            run_options += [ "--sig-proxy" ]
+            run_options += [ "--rm" ]     # This is how we ensure container cleanup
+            run_options += [ "--cidfile", state.resolve("cid") ]
 
-        place_uris(launchy, self.shared_dir, self.optimistic_unpack)
-        run_options += [ "-w", self.workdir ]
+            place_uris(launchy, self.shared_dir, self.optimistic_unpack)
+            run_options += [ "-w", self.workdir ]
 
-        # Docker requires an absolute path to a source filesystem, separated
-        # from the bind path in the container with a colon, but the absolute
-        # path to the Mesos sandbox might have colons in it (TaskIDs with
-        # timestamps can cause this situation). So we create a soft link to it
-        # and mount that.
-        shared_full = os.path.abspath(self.shared_dir)
-        sandbox_symlink = state.sandbox_symlink(shared_full)
-        run_options += [ "-v", "%s:%s" % (sandbox_symlink, self.workdir) ]
+            # Docker requires an absolute path to a source filesystem, separated
+            # from the bind path in the container with a colon, but the absolute
+            # path to the Mesos sandbox might have colons in it (TaskIDs with
+            # timestamps can cause this situation). So we create a soft link to it
+            # and mount that.
+            shared_full = os.path.abspath(self.shared_dir)
+            sandbox_symlink = state.sandbox_symlink(shared_full)
+            run_options += [ "-v", "%s:%s" % (sandbox_symlink, self.workdir) ]
 
-        cpus, mems = launchy.cpu_and_mem
-        env = launchy.env
-        run_options += options
+            cpus, mems = launchy.cpu_and_mem
+            env = launchy.env
+            run_options += options
 
         # We need to wrap the call to Docker in a call to the Mesos executor
         # if no executor is passed as part of the task. We need to pass the
@@ -122,9 +127,12 @@ class Docker(Containerizer, _Struct):
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
-        runner_argv = deimos.docker.run(run_options, image, launchy.argv,
-                                        env=env, ports=launchy.ports,
-                                        cpus=cpus, mems=mems)
+        if not non:
+            runner_argv = deimos.docker.run(run_options, image, launchy.argv,
+                                            env=env, ports=launchy.ports,
+                                            cpus=cpus, mems=mems)
+        else:
+            runner_argv = launchy.argv
 
         log_mesos_env(logging.DEBUG)
 
@@ -137,7 +145,8 @@ class Docker(Containerizer, _Struct):
                                                                 stdout=o,
                                                                 stderr=e)
                     state.pid(self.runner.pid)
-                    state.await_cid()
+                    if not non:
+                        state.await_cid()
                     state.push()
                     lk_w = state.lock("wait", LOCK_EX)
                     lk_l.unlock()
@@ -165,7 +174,17 @@ class Docker(Containerizer, _Struct):
                                                           stdout=obs_out,
                                                           stderr=obs_err,
                                                           close_fds=True)
-        data = Run(data=True)(deimos.docker.wait(state.cid()))
+        if not non:
+            data = Run(data=True)(deimos.docker.wait(state.cid()))
+        else:
+            log.info("Awaiting PID: %d" % self.runner.pid)
+            while True:
+                try:
+                    os.kill(self.runner.pid, 0) # Pid exists
+                except OSError:
+                    break
+                time.sleep(1)
+            data = self.runner.wait() # Why does this exit early?
         state.exit(data)
         lk_w.unlock()
         for p, arr in [(self.runner, runner_argv), (observer, observer_argv)]:
@@ -196,6 +215,15 @@ class Docker(Containerizer, _Struct):
         state = deimos.state.State(self.state_root, mesos_id=container_id)
         state.await_launch()
         state.ids()
+        if state.is_non():
+            recordio.write(ResourceStatistics,
+                           timestamp             = time.time(),
+                           mem_limit_bytes       = 2**30,
+                           cpus_limit            = 1.0,
+                         # cpus_user_time_secs   = cg.cpuacct.user_time(),
+                         # cpus_system_time_secs = cg.cpuacct.system_time(),
+                           mem_rss_bytes         = 2**30)
+            return 0
         if state.cid() is None:
             log.info("Container not started?")
             return 0
@@ -263,7 +291,10 @@ class Docker(Containerizer, _Struct):
         state.await_launch()
         lk_d = state.lock("destroy", LOCK_EX)
         if state.exit() is None:
-            Run()(deimos.docker.stop(state.cid()))
+            if state.is_non():
+                os.kill(state.pid(), signal.SIGTERM)
+            else:
+                Run()(deimos.docker.stop(state.cid()))
         else:
             log.info("Container is stopped")
         return 0
