@@ -19,7 +19,8 @@ import deimos.usage
 
 def cli(argv=None):
     deimos.sig.install(lambda _: None)
-    if argv is None: argv = sys.argv
+    if argv is None:
+        argv = sys.argv
     sub = argv[1] if len(argv) > 1 else None
 
     if sub in ["-h", "--help", "help"]:
@@ -40,7 +41,7 @@ def cli(argv=None):
 
     if sub == "state":
         cleanup = deimos.cleanup.Cleanup(conf.state.root)
-        t, rm   = time.time(), False
+        t, rm = time.time(), False
         for arg in argv[2:]:
             if arg == "--rm":
                 rm = True
@@ -90,6 +91,7 @@ def cli(argv=None):
         log.exception("Unhandled failure in %s", sub)
         return 8
     return 0
+
 
 def format_help():
     return """
@@ -147,4 +149,3 @@ def format_help():
 
 if __name__ == "__main__":
     sys.exit(cli(sys.argv))
-
