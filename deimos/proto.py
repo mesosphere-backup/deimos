@@ -7,7 +7,8 @@ from deimos.err import Err
 from deimos.logger import log
 
 
-class recordio(): # Really just a namespace
+class recordio():  # Really just a namespace
+
     """
     Read and write length-prefixed Protobufs on the STDIO streams.
     """
@@ -21,18 +22,21 @@ class recordio(): # Really just a namespace
         if len(data) != size:
             raise Err("Expected %d bytes; received %d", size, len(data))
         return deserialize(cls, data)
+
     @staticmethod
     def write(cls, **properties):
         data = serialize(cls, **properties)
         sys.stdout.write(struct.pack('I', len(data)))
         sys.stdout.write(data)
         pass
+
     @staticmethod
     def writeProto(proto):
         data = proto.SerializeToString()
         sys.stdout.write(struct.pack('I', len(data)))
         sys.stdout.write(data)
         pass
+
 
 def serialize(cls, **properties):
     """
@@ -46,6 +50,7 @@ def serialize(cls, **properties):
         setattr(obj, k, v)
     return obj.SerializeToString()
 
+
 def deserialize(cls, data):
     obj = cls()
     obj.ParseFromString(data)
@@ -53,7 +58,7 @@ def deserialize(cls, data):
         log.debug(line)
     return obj
 
+
 def lines(proto):
     s = google.protobuf.text_format.MessageToString(proto)
     return s.strip().split("\n")
-

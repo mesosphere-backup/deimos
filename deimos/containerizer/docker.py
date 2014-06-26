@@ -34,6 +34,7 @@ import deimos.sig
 
 
 class Docker(Containerizer, _Struct):
+
     def __init__(self, workdir="/tmp/mesos-sandbox",
                        state_root="/tmp/deimos",
                        shared_dir="fs",
@@ -48,6 +49,7 @@ class Docker(Containerizer, _Struct):
                                index_settings=index_settings,
                                runner=None,
                                state=None)
+
     def launch(self, launch_pb, *args):
         log.info(" ".join(args))
         fork = False if "--no-fork" in args else True
@@ -61,7 +63,7 @@ class Docker(Containerizer, _Struct):
         state.executor_id = launchy.executor_id
         state.push()
         state.ids()
-        mesos_directory() # Redundant?
+        mesos_directory()  # Redundant?
         if launchy.directory:
             os.chdir(launchy.directory)
         # TODO: if launchy.user:
@@ -73,12 +75,12 @@ class Docker(Containerizer, _Struct):
         if image == "":
             image = self.default_image(launchy)
         log.info("image  = %s", image)
-        run_options += [ "--sig-proxy" ]
-        run_options += [ "--rm" ]     # This is how we ensure container cleanup
-        run_options += [ "--cidfile", state.resolve("cid") ]
+        run_options += ["--sig-proxy"]
+        run_options += ["--rm"]       # This is how we ensure container cleanup
+        run_options += ["--cidfile", state.resolve("cid")]
 
         place_uris(launchy, self.shared_dir, self.optimistic_unpack)
-        run_options += [ "-w", self.workdir ]
+        run_options += ["-w", self.workdir]
 
         # Docker requires an absolute path to a source filesystem, separated
         # from the bind path in the container with a colon, but the absolute
@@ -87,7 +89,7 @@ class Docker(Containerizer, _Struct):
         # and mount that.
         shared_full = os.path.abspath(self.shared_dir)
         sandbox_symlink = state.sandbox_symlink(shared_full)
-        run_options += [ "-v", "%s:%s" % (sandbox_symlink, self.workdir) ]
+        run_options += ["-v", "%s:%s" % (sandbox_symlink, self.workdir)]
 
         cpus, mems = launchy.cpu_and_mem
         env = launchy.env
@@ -101,9 +103,9 @@ class Docker(Containerizer, _Struct):
         if launchy.needs_observer:
             # NB: The "@@docker@@" variant is a work around for Mesos's option
             # parser. There is a fix in the pipeline.
-            observer_argv = [ mesos_executor(), "--override",
-                              deimos.path.me(), "observe", state.mesos_id ]
-            state.lock("observe", LOCK_EX|LOCK_NB) ####### Explanation of Locks
+            observer_argv = [mesos_executor(), "--override",
+                             deimos.path.me(), "observe", state.mesos_id]
+            state.lock("observe", LOCK_EX | LOCK_NB)     # Explanation of Locks
             # When the observer is running, we would like its call to
             # observe() to finish before all the wait(); and we'd like the
             # observer to have a chance to report TASK_FINISHED before the
@@ -187,9 +189,11 @@ class Docker(Containerizer, _Struct):
             else:
                 log.warning(msg)
         return state.exit()
+
     def update(self, update_pb, *args):
         log.info(" ".join(args))
         log.info("Update is a no-op for Docker...")
+
     def usage(self, usage_pb, *args):
         log.info(" ".join(args))
         container_id = usage_pb.container_id.value
@@ -208,23 +212,24 @@ class Docker(Containerizer, _Struct):
             return 0
         try:
             recordio.write(ResourceStatistics,
-                           timestamp             = time.time(),
-                           mem_limit_bytes       = cg.memory.limit(),
-                           cpus_limit            = cg.cpu.limit(),
-                         # cpus_user_time_secs   = cg.cpuacct.user_time(),
-                         # cpus_system_time_secs = cg.cpuacct.system_time(),
-                           mem_rss_bytes         = cg.memory.rss())
+                           timestamp=time.time(),
+                           mem_limit_bytes=cg.memory.limit(),
+                           cpus_limit=cg.cpu.limit(),
+                           # cpus_user_time_secs   = cg.cpuacct.user_time(),
+                           # cpus_system_time_secs = cg.cpuacct.system_time(),
+                           mem_rss_bytes=cg.memory.rss())
         except AttributeError as e:
             log.error("Missing CGroup!")
             raise e
         return 0
+
     def observe(self, *args):
         log.info(" ".join(args))
         state = deimos.state.State(self.state_root, mesos_id=args[0])
         self.state = state
         deimos.sig.install(self.stop_docker_and_resume)
         state.await_launch()
-        try: # Take the wait lock to block calls to wait()
+        try:  # Take the wait lock to block calls to wait()
             state.lock("wait", LOCK_SH, seconds=None)
         except IOError as e:                       # Allows for signal recovery
             if e.errno != errno.EINTR:
@@ -233,6 +238,7 @@ class Docker(Containerizer, _Struct):
         if state.exit() is not None:
             return state.exit()
         raise Err("Wait lock is not held nor is exit file present")
+
     def wait(self, wait_pb, *args):
         log.info(" ".join(args))
         container_id = wait_pb.container_id.value
@@ -240,7 +246,7 @@ class Docker(Containerizer, _Struct):
         self.state = state
         deimos.sig.install(self.stop_docker_and_resume)
         state.await_launch()
-        try: # Wait for the observe lock so observe completes first
+        try:  # Wait for the observe lock so observe completes first
             state.lock("observe", LOCK_SH, seconds=None)
             state.lock("wait", LOCK_SH, seconds=None)
         except IOError as e:                       # Allows for signal recovery
@@ -250,12 +256,13 @@ class Docker(Containerizer, _Struct):
             state.lock("wait", LOCK_SH, seconds=1)
         termination = (state.exit() if state.exit() is not None else 64) << 8
         recordio.write(Termination,
-                       killed  = False,
-                       message = "",
-                       status  = termination)
+                       killed=False,
+                       message="",
+                       status=termination)
         if state.exit() is not None:
             return state.exit()
         raise Err("Wait lock is not held nor is exit file present")
+
     def destroy(self, destroy_pb, *args):
         log.info(" ".join(args))
         container_id = destroy_pb.container_id.value
@@ -267,6 +274,7 @@ class Docker(Containerizer, _Struct):
         else:
             log.info("Container is stopped")
         return 0
+
     def containers(self, *args):
         log.info(" ".join(args))
         data = Run(data=True)(deimos.docker.docker("ps", "--no-trunc", "-q"))
@@ -277,7 +285,7 @@ class Docker(Containerizer, _Struct):
             if not state.exists():
                 continue
             try:
-                state.lock("wait", LOCK_SH|LOCK_NB)
+                state.lock("wait", LOCK_SH | LOCK_NB)
             except deimos.flock.Err:     # LOCK_EX held, so launch() is running
                 mesos_ids += [state.mesos_container_id()]
         containers = Containers()
@@ -286,8 +294,10 @@ class Docker(Containerizer, _Struct):
             container.value = mesos_id
         recordio.writeProto(containers)
         return 0
+
     def log_signal(self, signum):
         pass
+
     def stop_docker_and_resume(self, signum):
         if self.state is not None and self.state.cid() is not None:
             cid = self.state.cid()
@@ -297,6 +307,7 @@ class Docker(Containerizer, _Struct):
             except subprocess.CalledProcessError:
                 pass
             return deimos.sig.Resume()
+
     def default_image(self, launchy):
         opts = dict(self.index_settings.items(onlyset=True))
         if "account_libmesos" in opts:
@@ -304,4 +315,3 @@ class Docker(Containerizer, _Struct):
                 opts["account"] = opts["account_libmesos"]
             del opts["account_libmesos"]
         return deimos.docker.matching_image_for_host(**opts)
-

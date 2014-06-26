@@ -1,5 +1,6 @@
 # coding: utf-8
 
+
 def argv(*args, **opts):
     """
     Produces an argument vector from its array of arguments and keyword
@@ -23,14 +24,18 @@ def argv(*args, **opts):
 
     """
     spacer = ["--"] if opts.get("__") else []
-    args   = [ arg(_) for _ in args ]
-    opts   = [ _ for k, v in opts.items() for _ in opt(k, v) ]
+    args = [arg(_) for _ in args]
+    opts = [_ for k, v in opts.items() for _ in opt(k, v)]
     return opts + spacer + args
 
+
 def arg(v):
-    if type(v) in strings: return v
-    if type(v) in nums: return str(v)
+    if type(v) in strings:
+        return v
+    if type(v) in nums:
+        return str(v)
     raise TypeError("Type %s is not a simple, flat type" % type(v))
+
 
 def opt(k, v):
     k = arg(k).replace("_", "-")
@@ -42,10 +47,10 @@ def opt(k, v):
     if type(v) in simple:
         return [k, arg(v)]
     if isinstance(v, dict):
-        v = [ "%s=%s" % (arg(kk), arg(vv)) for kk, vv in v.items() ]
-    return [ _ for element in v for _ in [k, arg(element)] ]
+        v = ["%s=%s" % (arg(kk), arg(vv)) for kk, vv in v.items()]
+    return [_ for element in v for _ in [k, arg(element)]]
 
-nums    = set([int, long, float])
+
+nums = set([int, long, float])
 strings = set([str, unicode, bytes])
-simple  = strings | nums
-
+simple = strings | nums

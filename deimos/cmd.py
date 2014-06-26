@@ -10,19 +10,21 @@ from deimos._struct import _Struct
 
 
 class Run(_Struct):
+
     def __init__(self, log=None, data=False, in_sh=True,
                        close_stdin=True, log_stderr=True,
                        start_level=logging.DEBUG,
                        success_level=logging.DEBUG,
                        error_level=logging.WARNING):
-        _Struct.__init__(self, log   = log if log else deimos.logger.logger(2),
-                               data  = data,
-                               in_sh = in_sh,
-                               close_stdin   = close_stdin,
-                               log_stderr    = log_stderr,
-                               start_level   = start_level,
-                               success_level = success_level,
-                               error_level   = error_level)
+        _Struct.__init__(self, log=(log if log else deimos.logger.logger(2)),
+                               data=data,
+                               in_sh=in_sh,
+                               close_stdin=close_stdin,
+                               log_stderr=log_stderr,
+                               start_level=start_level,
+                               success_level=success_level,
+                               error_level=error_level)
+
     def __call__(self, argv, *args, **opts):
         out, err = None, None
         if "stdout" not in opts:
@@ -31,7 +33,7 @@ class Run(_Struct):
             opts["stderr"] = subprocess.PIPE if self.log_stderr else None
         try:
             self.log.log(self.start_level, present(argv))
-            argv_  = in_sh(argv, not self.data) if self.in_sh else argv
+            argv_ = in_sh(argv, not self.data) if self.in_sh else argv
             with open(os.devnull) as devnull:
                 if self.close_stdin and "stdin" not in opts:
                     opts["stdin"] = devnull
@@ -50,6 +52,7 @@ class Run(_Struct):
             self.log.log(self.error_level, "STDERR // " + err)
         raise subprocess.CalledProcessError(code, argv)
 
+
 def present(argv, token=None):
     if isinstance(token, basestring):
         return "%s // %s" % (token, escape(argv))
@@ -57,9 +60,11 @@ def present(argv, token=None):
         return "exit %d // %s" % (token, escape(argv))
     return "call // %s" % escape(argv)
 
+
 def escape(argv):
     # NB: The pipes.quote() function is deprecated in Python 3
     return " ".join(pipes.quote(_) for _ in argv)
+
 
 def in_sh(argv, allstderr=True):
     """
@@ -72,4 +77,3 @@ def in_sh(argv, allstderr=True):
     #     matters.
     call = 'exec "$@" >&2' if allstderr else 'exec "$@"'
     return ["/bin/sh", "-c", call, "sh"] + argv
-

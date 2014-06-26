@@ -12,10 +12,12 @@ from deimos._struct import _Struct
 
 
 class Cleanup(_Struct):
+
     def __init__(self, root="/tmp/deimos", optimistic=False):
         _Struct.__init__(self, root=root,
                                optimistic=optimistic,
                                lock=os.path.join(root, "cleanup"))
+
     def dirs(self, before=time.time(), exited=True):
         """
         Provider a generator of container state directories.
@@ -27,7 +29,7 @@ class Cleanup(_Struct):
         timestamp = iso(before)
         root = os.path.join(self.root, "start-time")
         os.chdir(root)
-        by_t = ( d for d in glob.iglob("????-??-??T*.*Z") if d < timestamp )
+        by_t = (d for d in glob.iglob("????-??-??T*.*Z") if d < timestamp)
         if exited is None:
             def predicate(directory):
                 return True
@@ -35,10 +37,11 @@ class Cleanup(_Struct):
             def predicate(directory):
                 exit = os.path.join(directory, "exit")
                 return os.path.exists(exit) is exited
-        return ( os.path.join(root, d) for d in by_t if predicate(d) )
+        return (os.path.join(root, d) for d in by_t if predicate(d))
+
     def remove(self, *args, **kwargs):
         errors = 0
-        lk = deimos.flock.LK(self.lock, LOCK_EX|LOCK_NB) 
+        lk = deimos.flock.LK(self.lock, LOCK_EX | LOCK_NB)
         try:
             lk.lock()
         except deimos.flock.Err:
@@ -56,7 +59,7 @@ class Cleanup(_Struct):
                     log.warning("Not able to load state from: %s", d)
                     continue
                 try:
-                    cmd  = ["rm", "-rf", d + "/"]
+                    cmd = ["rm", "-rf", d + "/"]
                     cmd += [state._mesos()]
                     if state.cid() is not None:
                         cmd += [state._docker()]
@@ -68,4 +71,3 @@ class Cleanup(_Struct):
         if errors != 0:
             log.error("There were failures on %d directories", errors)
             return 4
-

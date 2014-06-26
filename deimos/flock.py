@@ -13,13 +13,16 @@ from deimos._struct import _Struct
 
 locks = {}
 
+
 class LK(_Struct):
     default_timeout = 10
+
     def __new__(cls, path, flags, seconds=default_timeout):
         if os.path.abspath(path) in locks:
             return locks[path]
         else:
             return super(LK, cls).__new__(cls, path, flags, seconds)
+
     def __init__(self, path, flags, seconds=default_timeout):
         """Construct a lockable file handle. Handles are recycled.
 
@@ -36,6 +39,7 @@ class LK(_Struct):
                                    flags=flags,
                                    seconds=seconds)
             locks[self.path] = self
+
     def lock(self):
         if self.handle is None or self.handle.closed:
             self.handle = open(self.path, "w+")
@@ -52,18 +56,22 @@ class LK(_Struct):
                 try:
                     fcntl.flock(self.handle, self.flags)
                 except IOError as e:
-                    if e.errno not in [errno.EINTR, errno.EACCES, errno.EAGAIN]:
+                    errnos = [errno.EINTR, errno.EACCES, errno.EAGAIN]
+                    if e.errno not in errnos:
                         raise e
                     raise Timeout(self.path)
+
     def unlock(self):
         if not self.handle.closed:
             fcntl.flock(self.handle, fcntl.LOCK_UN)
             self.handle.close()
 
+
 def format_lock_flags(flags):
-    tokens = [ ("EX", fcntl.LOCK_EX), ("SH", fcntl.LOCK_SH),
-               ("UN", fcntl.LOCK_UN), ("NB", fcntl.LOCK_NB) ]
-    return "|".join( s for s, flag in tokens if (flags & flag) != 0 )
+    tokens = [("EX", fcntl.LOCK_EX), ("SH", fcntl.LOCK_SH),
+               ("UN", fcntl.LOCK_UN), ("NB", fcntl.LOCK_NB)]
+    return "|".join(s for s, flag in tokens if (flags & flag) != 0)
+
 
 def nb_seconds(flags, seconds):
     if seconds == 0:
@@ -72,9 +80,18 @@ def nb_seconds(flags, seconds):
         seconds = 0
     return flags, seconds
 
-class Err(deimos.err.Err): pass
-class Timeout(Err): pass
-class Locked(Err): pass
+
+class Err(deimos.err.Err):
+    pass
+
+
+class Timeout(Err):
+    pass
+
+
+class Locked(Err):
+    pass
+
 
 def lock_browser(directory):
     bash = """
@@ -84,7 +101,7 @@ def lock_browser(directory):
           find "$1" -type f -printf '%i %p\\n' | LC_ALL=C LANG=C sort
         }
 
-        function locking_pids_by_inode { 
+        function locking_pids_by_inode {
           cat /proc/locks |
           sed -r '
             s/^.+ ([^ ]+) +([0-9]+) [^ :]+:[^ :]+:([0-9]+) .+$/\\3 \\2 \\1/
@@ -93,11 +110,13 @@ def lock_browser(directory):
 
         join <(locking_pids_by_inode) <(files_by_inode "$1")
     """
-    subprocess.check_call([ "bash", "-c", bash, "bash",
-                            os.path.abspath(directory) ])
+    subprocess.check_call(["bash", "-c", bash, "bash",
+                           os.path.abspath(directory)])
 
 # Thanks to Glenn Maynard
 # http://stackoverflow.com/questions/5255220/fcntl-flock-how-to-implement-a-timeout/5255473#5255473
+
+
 @contextmanager
 def timeout(seconds):
     def timeout_handler(signum, frame):
@@ -109,4 +128,3 @@ def timeout(seconds):
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, original_handler)
-
