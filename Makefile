@@ -5,6 +5,10 @@ prefix := usr/local
 proto: proto/mesos.proto
 	protoc --proto_path=proto/ --python_out=deimos/ proto/*.proto
 
+.PHONY: pep8
+pep8:
+	bin/pep8-report
+
 .PHONY: deb
 deb: clean freeze
 	cd toor && \

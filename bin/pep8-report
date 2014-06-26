@@ -1,0 +1,15 @@
+#!/bin/bash
+set -o errexit -o pipefail -o nounset
+
+file=pep8.txt
+
+if find deimos -type f -name '*'.py -and -not -name '*_pb2.py' -print0 |
+   xargs -0 pep8 > "$file"
+then
+  echo 'Code is conformant with PEP-8 formatting guidelines' >&2
+else
+  code=$?
+  echo "Code is not conformant with PEP-8; please see: $file" >&2
+  exit $code
+fi
+
