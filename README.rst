@@ -5,13 +5,6 @@ deimos
 Deimos is a Docker plugin for Mesos, providing external containerization as
 described in `MESOS-816`_.
 
-**NOTE**: Deimos is currently under heavy development and relies on very recent
-changes in Mesos master that have not been released yet. Be prepared for some
-bumps and changing APIs. If you run into trouble, please file an issue on
-Github.  Official support for external containerizers like Deimos will be
-available in the next Mesos release (0.19), at which point there will be a
-stable release of Deimos as well.
-
 ------------
 Installation
 ------------
@@ -23,13 +16,6 @@ Deimos can be installed `from the Cheeseshop`_.
 .. code-block:: bash
 
     pip install deimos
-
-Although Deimos does not have a library dependency on a particular Mesos
-version, one does need a development version of the `Mesos package`_ (for which
-there are also `Python bindings`_), available only for very recent Ubuntu, to
-try out external containerizers. If you want to use Deimos together with
-Marathon, please use `this patched Marathon`_. Official support for external
-containerizers will be available in the next Mesos release (0.19).
 
 ----------------------------
 Passing Parameters to Docker
@@ -198,10 +184,5 @@ The packaged version of Mesos can also load these options from files:
 
 .. _MESOS-816: https://issues.apache.org/jira/browse/MESOS-816
 
-.. _`Mesos package`: http://downloads.mesosphere.io/master/ubuntu/13.10/mesos_0.19.0-xcon2_amd64.deb
-
-.. _`Python bindings`: http://downloads.mesosphere.io/master/ubuntu/13.10/mesos_0.19.0-xcon2_amd64.egg
-
 .. _`this Gist`: https://gist.github.com/solidsnack/10944095
 
-.. _`this patched Marathon`: http://downloads.mesosphere.io/marathon/marathon_0.5.0-xcon2_noarch.deb
