@@ -152,7 +152,7 @@ def place_uris(launchy, directory, optimistic_unpack=False):
             log.info("Not able to determine basename: %r", uri)
             continue
         try:
-            cmd(["curl", "-sSfL", uri, "--output", f])
+            cmd(fetcher_command(uri, f))
         except subprocess.CalledProcessError as e:
             log.warning("Failed while processing URI: %s",
                         deimos.cmd.escape(uri))
@@ -163,6 +163,12 @@ def place_uris(launchy, directory, optimistic_unpack=False):
             log.info("Unpacking %s" % f)
             cmd(gen_unpack_cmd(f, directory))
             cmd(["rm", "-f", f])
+
+
+def fetcher_command(uri, target):
+    if uri[0:5] == "s3://":
+        return ["aws", "s3", "cp", uri, target]
+    return ["curl", "-sSfL", uri, "--output", target]
 
 
 def unpacker(uri):
