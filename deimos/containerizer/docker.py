@@ -69,11 +69,7 @@ class Docker(Containerizer, _Struct):
         # TODO: if launchy.user:
         #           os.seteuid(launchy.user)
         url, options = self.container_settings.override(*launchy.container)
-        pre, image = re.split(r"^docker:///?", url)
-        if pre != "":
-            raise Err("URL '%s' is not a valid docker:// URL!" % url)
-        if image == "":
-            image = self.default_image(launchy)
+        image = self.determine_image(url, launchy)
         log.info("image  = %s", image)
         run_options += ["--sig-proxy"]
         run_options += ["--rm"]       # This is how we ensure container cleanup
@@ -308,10 +304,26 @@ class Docker(Containerizer, _Struct):
                 pass
             return deimos.sig.Resume()
 
-    def default_image(self, launchy):
+    def determine_image(self, url, launchy):
+        opts = dict(self.container_settings.image.items(onlyset=True))
+        if "default" in opts:
+            default = url_to_image(opts["default"])
+        else:
+            default = self.image_from_system_context(launchy)
+        image = url_to_image(url)
+        return default if image == "" else image
+
+    def image_from_system_context(self, launchy):
         opts = dict(self.index_settings.items(onlyset=True))
         if "account_libmesos" in opts:
             if not launchy.needs_observer:
                 opts["account"] = opts["account_libmesos"]
             del opts["account_libmesos"]
         return deimos.docker.matching_image_for_host(**opts)
+
+def url_to_image(url):
+    pre, image = re.split(r"^docker:///?", url)
+    if pre != "":
+        raise Err("URL '%s' is not a valid docker:// URL!" % url)
+    return image
+
