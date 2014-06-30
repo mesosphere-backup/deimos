@@ -7,7 +7,7 @@ proto: proto/mesos.proto
 
 .PHONY: pep8
 pep8:
-	pep8 --exclude='*_pb2.py' --ignore E127 deimos > pep8.txt
+	pep8 --exclude=*_pb2.py --ignore E127 deimos | tee pep8.txt | head -n8
 
 .PHONY: deb
 deb: clean freeze
