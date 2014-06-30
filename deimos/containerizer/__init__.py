@@ -155,7 +155,7 @@ def place_uris(launchy, directory, optimistic_unpack=False):
             cmd(fetcher_command(uri, f))
         except subprocess.CalledProcessError as e:
             log.warning("Failed while processing URI: %s",
-                        deimos.cmd.escape(uri))
+                        deimos.cmd.escape([uri]))
             continue
         if item.executable:
             os.chmod(f, 0755)
