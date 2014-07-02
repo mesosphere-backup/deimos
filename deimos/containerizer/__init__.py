@@ -94,9 +94,9 @@ def stdio(containerizer, *args):
         raise Err("Subcommand %s is not valid for containerizers" % name)
     log.debug("%r", (method, proto))
     if proto is not None:
-        method(recordio.read(proto), *args[1:])
+        return method(recordio.read(proto), *args[1:])
     else:
-        method(*args[1:])
+        return method(*args[1:])
 
 
 # Mesos interface helpers
