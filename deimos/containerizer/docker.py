@@ -68,7 +68,12 @@ class Docker(Containerizer, _Struct):
             os.chdir(launchy.directory)
         # TODO: if launchy.user:
         #           os.seteuid(launchy.user)
-        url, options = self.container_settings.override(*launchy.container)
+        url, options = launchy.container
+        options, trailing_argv = split_on(options, "//")
+        url, options = self.container_settings.override(url, options)
+
+        true_argv = launchy.argv if trailing_argv is None else trailing_argv
+
         image = self.determine_image(url, launchy)
         log.info("image  = %s", image)
         run_options += ["--sig-proxy"]
@@ -120,7 +125,7 @@ class Docker(Containerizer, _Struct):
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
-        runner_argv = deimos.docker.run(run_options, image, launchy.argv,
+        runner_argv = deimos.docker.run(run_options, image, true_argv,
                                         env=env, ports=launchy.ports,
                                         cpus=cpus, mems=mems)
 
@@ -327,3 +332,7 @@ def url_to_image(url):
         raise Err("URL '%s' is not a valid docker:// URL!" % url)
     return image
 
+def split_on(iterable, element):
+    preceding = list(takewhile(lambda _: _ != element, iterable))
+    following = list(dropwhile(lambda _: _ != element, iterable))
+    return preceding, (following[1:] if len(following) > 0 else None)
