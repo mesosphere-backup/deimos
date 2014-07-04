@@ -95,10 +95,11 @@ def cli(argv=None):
 
 def format_help():
     return """
- USAGE: deimos launch  (--no-fork)?
+ USAGE: deimos launch (--no-fork)?
         deimos usage
         deimos destroy
-        deimos wait    (--docker <docker-id>)?
+        deimos wait
+        deimos observe <mesos-container-id>
         deimos locks
         deimos state
 
@@ -124,12 +125,14 @@ def format_help():
 
   Shuts down the specified container.
 
- deimos wait (--docker <docker-id>)?
+ deimos wait
 
-  Without --docker, reads STDIN to find the container to watch.
+  Reads STDIN to find the container to watch.
 
-  With --docker, waits for a particular Docker CID to exit and records the
-  result in the state directory, returning an appropriate exit code.
+ deimos observe <mesos-container-id>
+
+  Observes the Mesos container ID, in a way that blocks all calls to `wait`.
+  It is for internal use...probably don't want to play with this one.
 
  deimos locks
 
