@@ -149,10 +149,13 @@ class Docker(_Struct):
 
 class DockerIndex(_Struct):
 
-    def __init__(self, index=None, account_libmesos="libmesos", account=None):
+    def __init__(self, index=None, account_libmesos="libmesos",
+                                   account=None,
+                                   dockercfg=None):
         _Struct.__init__(self, index=index,
                                account_libmesos=account_libmesos,
-                               account=account)
+                               account=account,
+                               dockercfg=dockercfg)
 
 
 class State(_Struct):

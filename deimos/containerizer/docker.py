@@ -132,6 +132,8 @@ class Docker(Containerizer, _Struct):
 
         log_mesos_env(logging.DEBUG)
 
+        self.place_dockercfg()
+
         observer = None
         with open("stdout", "w") as o:        # This awkward multi 'with' is a
             with open("stderr", "w") as e:    # concession to 2.6 compatibility
@@ -326,6 +328,12 @@ class Docker(Containerizer, _Struct):
                 opts["account"] = opts["account_libmesos"]
             del opts["account_libmesos"]
         return deimos.docker.matching_image_for_host(**opts)
+
+    def place_dockercfg(self):
+        dockercfg = self.index_settings.dockercfg
+        if dockercfg is not None:
+            log.info("Copying to .dockercfg: %q" % dockercfg)
+            Run()(["cp", dockercfg, ".dockercfg"])
 
 def url_to_image(url):
     pre, image = re.split(r"^docker:///?", url)
