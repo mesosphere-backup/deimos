@@ -126,13 +126,13 @@ class Docker(Containerizer, _Struct):
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
+        self.place_dockercfg()
+
         runner_argv = deimos.docker.run(run_options, image, true_argv,
                                         env=env, ports=launchy.ports,
                                         cpus=cpus, mems=mems)
 
         log_mesos_env(logging.DEBUG)
-
-        self.place_dockercfg()
 
         observer = None
         with open("stdout", "w") as o:        # This awkward multi 'with' is a

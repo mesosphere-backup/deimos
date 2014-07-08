@@ -189,6 +189,9 @@ def parse(f):
         del parsed["containers.options"]
     if len(containers) > 0:
         parsed["containers"] = Containers(**containers)
+    if "docker.index" in parsed:
+        parsed["index"] = parsed["docker.index"]
+        del parsed["docker.index"]
     return _Struct(**parsed)
 
 
