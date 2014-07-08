@@ -327,12 +327,14 @@ class Docker(Containerizer, _Struct):
             if not launchy.needs_observer:
                 opts["account"] = opts["account_libmesos"]
             del opts["account_libmesos"]
+        if "dockercfg" in opts:
+            del opts["dockercfg"]
         return deimos.docker.matching_image_for_host(**opts)
 
     def place_dockercfg(self):
         dockercfg = self.index_settings.dockercfg
         if dockercfg is not None:
-            log.info("Copying to .dockercfg: %q" % dockercfg)
+            log.info("Copying to .dockercfg: %s" % dockercfg)
             Run()(["cp", dockercfg, ".dockercfg"])
 
 def url_to_image(url):
