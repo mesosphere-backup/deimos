@@ -63,6 +63,7 @@ def cli(argv=None):
     deimos.docker.options = conf.docker.argv()
     containerizer = deimos.containerizer.docker.Docker(
         container_settings=conf.containers,
+        index_settings=conf.index,
         optimistic_unpack=conf.uris.unpack,
         state_root=conf.state.root
     )
