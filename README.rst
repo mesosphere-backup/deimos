@@ -38,7 +38,19 @@ of an *image URL* and *container options*. For example:
 
 Deimos handles image URLs beginning with ``docker:///`` by stripping the
 prefix and using the remainder as the image name. The container options are
-passed to ``docker run`` when the task is launched.
+passed to ``docker run`` when the task is launched. If a ``//`` is found in the 
+options list, all the following arguments will be append to the the end of 
+the run command. This is useful when using an image with an entrypoint defined.
+For example:
+
+.. code-block:: c
+
+    {
+      container = ContainerInfo {
+        image = "docker:///flynn/slugrunner"
+        options = ["//", "start", "web"]
+      }
+    }
 
 If no ``ContainerInfo`` is present in a task, Deimos will still containerize
 it, by using the ``--default_container_image`` passed to the slave, or taking
