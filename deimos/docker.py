@@ -123,7 +123,7 @@ def matching_image_for_host(distro=None, release=None, *args, **kwargs):
     return image_token("%s:%s" % (distro, release), *args, **kwargs)
 
 
-def image_token(name, account=None, index=None):
+def image_token(name, account=None, index=None, *args, **kwargs):
     return "/".join(_ for _ in [index, account, name] if _ is not None)
 
 

@@ -126,6 +126,8 @@ class Docker(Containerizer, _Struct):
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
+        self.place_dockercfg()
+
         runner_argv = deimos.docker.run(run_options, image, true_argv,
                                         env=env, ports=launchy.ports,
                                         cpus=cpus, mems=mems)
@@ -325,7 +327,15 @@ class Docker(Containerizer, _Struct):
             if not launchy.needs_observer:
                 opts["account"] = opts["account_libmesos"]
             del opts["account_libmesos"]
+        if "dockercfg" in opts:
+            del opts["dockercfg"]
         return deimos.docker.matching_image_for_host(**opts)
+
+    def place_dockercfg(self):
+        dockercfg = self.index_settings.dockercfg
+        if dockercfg is not None:
+            log.info("Copying to .dockercfg: %s" % dockercfg)
+            Run()(["cp", dockercfg, ".dockercfg"])
 
 def url_to_image(url):
     pre, image = re.split(r"^docker:///?", url)

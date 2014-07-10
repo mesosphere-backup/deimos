@@ -149,10 +149,13 @@ class Docker(_Struct):
 
 class DockerIndex(_Struct):
 
-    def __init__(self, index=None, account_libmesos="libmesos", account=None):
+    def __init__(self, index=None, account_libmesos="libmesos",
+                                   account=None,
+                                   dockercfg=None):
         _Struct.__init__(self, index=index,
                                account_libmesos=account_libmesos,
-                               account=account)
+                               account=account,
+                               dockercfg=dockercfg)
 
 
 class State(_Struct):
@@ -186,6 +189,9 @@ def parse(f):
         del parsed["containers.options"]
     if len(containers) > 0:
         parsed["containers"] = Containers(**containers)
+    if "docker.index" in parsed:
+        parsed["index"] = parsed["docker.index"]
+        del parsed["docker.index"]
     return _Struct(**parsed)
 
 
