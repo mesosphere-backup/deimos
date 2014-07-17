@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import re
+import subprocess
 
 try:                  # Prefer system installation of Mesos protos if available
     from mesos_pb2 import *

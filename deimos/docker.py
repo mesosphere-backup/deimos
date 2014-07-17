@@ -108,7 +108,10 @@ def cgroups(cid):
     paths = []
     paths += glob.glob("/sys/fs/cgroup/*/" + cid)
     paths += glob.glob("/sys/fs/cgroup/*/docker/" + cid)
-    return dict((s.split("/")[4], s) for s in paths)
+    paths += glob.glob("/cgroup/*/" + cid)
+    paths += glob.glob("/cgroup/*/docker/" + cid)
+    named_cgroups = [(s.split("/cgroup/")[1].split("/")[0], s) for s in paths]
+    return dict(named_cgroups)
 
 
 def matching_image_for_host(distro=None, release=None, *args, **kwargs):
