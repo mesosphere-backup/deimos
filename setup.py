@@ -6,10 +6,24 @@ import sys
 
 version = "deimos/VERSION"
 
+def check_output(*popenargs, **kwargs):
+    process = subprocess.Popen(stdout=subprocess.PIPE, *popenargs, **kwargs)
+    output, unused_err = process.communicate()
+    retcode = process.poll()
+    if retcode:
+        cmd = kwargs.get("args")
+        if cmd is None:
+            cmd = popenargs[0]
+        error = subprocess.CalledProcessError(retcode, cmd)
+        error.output = output
+        raise error
+    return output
 
 def sync_version():
     code = "git describe --tags --exact-match 2>/dev/null"
     try:
+        try: subprocess.check_output
+        except: subprocess.check_output = check_output
         v = subprocess.check_output(code, shell=True)
         with open(version, "w+") as h:
             h.write(v)
