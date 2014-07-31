@@ -18,6 +18,7 @@ def load_configuration(f=None, interactive=sys.stdout.isatty()):
                        containers=Containers(),
                        uris=URIs(),
                        state=State(),
+                       hooks=Hooks(),
                        log=Log(
                        console=(logging.DEBUG if interactive else None),
                        syslog=(logging.INFO if not interactive else None)
@@ -102,6 +103,16 @@ class Image(_Struct):
         return image if (image and not self.ignore) else self.default
 
 
+class Hooks(_Struct):
+
+    def __init__(self, unpack=False, onlaunch=[], ondestroy=[]):
+        _Struct.__init__(self, onlaunch=coercearray(onlaunch),
+                               ondestroy=coercearray(ondestroy))
+
+    def override(self, options=[]):
+        return self.onlaunch.override(onlaunch), self.ondestroy.override(ondestroy)
+
+
 class Options(_Struct):
 
     def __init__(self, default=[], append=[], ignore=False):
@@ -174,6 +185,7 @@ def parse(f):
                 ("docker", Docker),
                 ("docker.index", DockerIndex),
                 ("containers.image", Image),
+                ("hooks", Hooks),
                 ("containers.options", Options)]
     for key, cls in sections:
         try:

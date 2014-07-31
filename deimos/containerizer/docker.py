@@ -40,12 +40,14 @@ class Docker(Containerizer, _Struct):
                        state_root="/tmp/deimos",
                        shared_dir="fs",
                        optimistic_unpack=True,
+                       hooks=deimos.config.Hooks(),
                        container_settings=deimos.config.Containers(),
                        index_settings=deimos.config.DockerIndex()):
         _Struct.__init__(self, workdir=workdir,
                                state_root=state_root,
                                shared_dir=shared_dir,
                                optimistic_unpack=optimistic_unpack,
+                               hooks=hooks,
                                container_settings=container_settings,
                                index_settings=index_settings,
                                runner=None,
@@ -126,6 +128,9 @@ class Docker(Containerizer, _Struct):
         else:
             env += mesos_env() + [("MESOS_DIRECTORY", self.workdir)]
 
+        # Flatten our env list of tuples into dictionary object for Popen
+        popen_env = dict(env)
+
         self.place_dockercfg()
 
         runner_argv = deimos.docker.run(run_options, image, true_argv,
@@ -139,6 +144,20 @@ class Docker(Containerizer, _Struct):
             with open("stderr", "w") as e:    # concession to 2.6 compatibility
                 with open(os.devnull) as devnull:
                     log.info(deimos.cmd.present(runner_argv))
+
+                    onlaunch = self.hooks.onlaunch
+                    # test for default configuration (empty list)
+                    if onlaunch:
+                        # We're going to catch all exceptions because it's not
+                        # in scope for Deimos to stack trace on a hook error
+                        try:
+                            subprocess.Popen(onlaunch, stdin=devnull,
+                                             stdout=devnull,
+                                             stderr=devnull,
+                                             env=popen_env)
+                        except Exception as e:
+                            log.warning("onlaunch hook failed with %s" % e)
+
                     self.runner = subprocess.Popen(runner_argv, stdin=devnull,
                                                                 stdout=o,
                                                                 stderr=e)
@@ -192,6 +211,19 @@ class Docker(Containerizer, _Struct):
                 log.info(msg)
             else:
                 log.warning(msg)
+
+        with open(os.devnull) as devnull:
+            ondestroy = self.hooks.ondestroy
+            if ondestroy:
+                # Deimos shouldn't care if the hook fails. The hook should implement its own error handling
+                try:
+                    subprocess.Popen(ondestroy, stdin=devnull,
+                                     stdout=devnull,
+                                     stderr=devnull,
+                                     env=popen_env)
+                except Exception as e:
+                    log.warning("ondestroy hook failed with %s" % e)
+
         return state.exit()
 
     def update(self, update_pb, *args):

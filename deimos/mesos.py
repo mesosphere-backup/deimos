@@ -77,7 +77,10 @@ class LaunchProto(object):
 
     def env(self):
         cmd = self.command()
-        return [(_.name, _.value) for _ in cmd.environment.variables]
+        self.env = [(_.name, _.value) for _ in cmd.environment.variables]
+        # Add task_info.name to the environment variables
+        self.env += [("TASK_INFO", self.proto.task_info.name)]
+        return self.env
 
     def ports(self):
         resources = [_.ranges.range for _ in self.resources()

@@ -65,6 +65,7 @@ def cli(argv=None):
         container_settings=conf.containers,
         index_settings=conf.index,
         optimistic_unpack=conf.uris.unpack,
+        hooks=conf.hooks,
         state_root=conf.state.root
     )
 
