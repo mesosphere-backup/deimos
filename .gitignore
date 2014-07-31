@@ -1,8 +1,5 @@
 *.py[cod]
 
-# VERSION file is generated for distribution
-deimos/VERSION
-
 # C extensions
 *.so
 
