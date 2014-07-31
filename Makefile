@@ -1,5 +1,6 @@
 tmp := /tmp/deimos
 prefix := usr/local
+PKG_REL := 0.1.$(shell date -u +'%Y%m%d%H%M%S')
 
 .PHONY: proto
 proto: proto/mesos.proto
@@ -11,19 +12,16 @@ pep8:
 
 .PHONY: deb
 deb: clean freeze
-	cd toor && \
-	fpm -t deb -s dir \
-		-n deimos -v `cat ../deimos/VERSION` -p ../deimos.deb .
+	fpm -C toor -t deb -s dir \
+		-n deimos -v `cat deimos/VERSION` --iteration $(PKG_REL) .
 
 .PHONY: rpm
 rpm: clean freeze
-	cd toor && \
-	fpm -t rpm -s dir \
-		-n deimos -v `cat ../deimos/VERSION` -p ../deimos.rpm .
+	fpm -C toor -t rpm -s dir \
+		-n deimos -v `cat deimos/VERSION` --iteration $(PKG_REL) .
 
 # You will have to install bbfreeze to create a package `pip install bbfreeze`
 # Prep:
-# - echo "0.2.3" > deimos/VERSION
 # - sudo python setup.py develop
 .PHONY: freeze
 freeze:
