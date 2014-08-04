@@ -95,6 +95,14 @@ def inner_ports(image):
             return sorted(int(v.split(":")[-1]) for v in specs)
     return []  # If all else fails...
 
+@ensure_image
+def workdir(image):
+    info = image_info(image)
+    config = info.get("Config", info.get("config"))
+    if config:
+        d = config.get("WorkingDir", "")
+        if d != "":
+            return d
 
 # System and process interfaces
 

@@ -82,7 +82,9 @@ class Docker(Containerizer, _Struct):
         run_options += ["--cidfile", state.resolve("cid")]
 
         place_uris(launchy, self.shared_dir, self.optimistic_unpack)
-        run_options += ["-w", self.workdir]
+
+        if deimos.docker.workdir(image) is None:   # NB: Forces image pre-fetch
+            run_options += ["-w", self.workdir]
 
         # Docker requires an absolute path to a source filesystem, separated
         # from the bind path in the container with a colon, but the absolute
