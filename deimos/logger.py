@@ -82,12 +82,12 @@ _initialized = False
 _settings = {}
 
 try:
-  _null_handler = logging.NullHandler()
+    _null_handler = logging.NullHandler()
 except:
-  # Python 2.6 compatibility
-  class NullHandler(logging.Handler):
-    def emit(self, record):
-        pass
-  _null_handler = NullHandler()
+    # Python 2.6 compatibility
+    class NullHandler(logging.Handler):
+        def emit(self, record):
+            pass
+    _null_handler = NullHandler()
 
 root.addHandler(_null_handler)

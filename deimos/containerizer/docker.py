@@ -337,11 +337,13 @@ class Docker(Containerizer, _Struct):
             log.info("Copying to .dockercfg: %s" % dockercfg)
             Run()(["cp", dockercfg, ".dockercfg"])
 
+
 def url_to_image(url):
     pre, image = re.split(r"^docker:///?", url)
     if pre != "":
         raise Err("URL '%s' is not a valid docker:// URL!" % url)
     return image
+
 
 def split_on(iterable, element):
     preceding = list(takewhile(lambda _: _ != element, iterable))
