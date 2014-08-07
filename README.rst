@@ -9,7 +9,7 @@ described in `MESOS-816`_.
 Installation
 ------------
 
-For a complete installation walkthrough, see `this Gist`_.
+For a complete installation walkthrough, see `this article`_.
 
 Deimos can be installed `from the Cheeseshop`_.
 
@@ -196,5 +196,5 @@ The packaged version of Mesos can also load these options from files:
 
 .. _MESOS-816: https://issues.apache.org/jira/browse/MESOS-816
 
-.. _`this Gist`: https://gist.github.com/solidsnack/10944095
+.. _`this article`: https://mesosphere.io/learn/run-docker-on-mesosphere/
 
