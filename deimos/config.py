@@ -109,8 +109,9 @@ class Hooks(_Struct):
         _Struct.__init__(self, onlaunch=coercearray(onlaunch),
                                ondestroy=coercearray(ondestroy))
 
-    def override(self, options=[]):
-        return self.onlaunch.override(onlaunch), self.ondestroy.override(ondestroy)
+    def override(self, unpack=False, onlaunch=[], ondestroy=[]):
+        return self.onlaunch.override(onlaunch), \
+            self.ondestroy.override(ondestroy)
 
 
 class Options(_Struct):

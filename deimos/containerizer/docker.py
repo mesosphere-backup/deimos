@@ -215,7 +215,8 @@ class Docker(Containerizer, _Struct):
         with open(os.devnull) as devnull:
             ondestroy = self.hooks.ondestroy
             if ondestroy:
-                # Deimos shouldn't care if the hook fails. The hook should implement its own error handling
+                # Deimos shouldn't care if the hook fails.
+                # The hook should implement its own error handling.
                 try:
                     subprocess.Popen(ondestroy, stdin=devnull,
                                      stdout=devnull,
