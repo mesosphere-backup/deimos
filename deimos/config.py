@@ -110,8 +110,9 @@ class Hooks(_Struct):
                                ondestroy=coercearray(ondestroy))
 
     def override(self, unpack=False, onlaunch=[], ondestroy=[]):
-        return self.onlaunch.override(onlaunch), \
-            self.ondestroy.override(ondestroy)
+        onl = self.onlaunch.override(onlaunch)
+        ond = self.ondestroy.override(ondestroy)
+        return onl, ond
 
 
 class Options(_Struct):
