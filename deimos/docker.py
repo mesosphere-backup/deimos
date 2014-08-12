@@ -54,7 +54,7 @@ def pull(image):
 
 
 def pull_once(image):
-    if image not in images:
+    if image_info(image) is None:
         pull(image)
 
 
