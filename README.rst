@@ -5,6 +5,9 @@ deimos
 Deimos is a Docker plugin for Mesos, providing external containerization as
 described in `MESOS-816`_.
 
+NOTE: Mesos 0.20.0 shipped with built in Docker support and this project is no longer actively maintained.
+More info on the `Docker in Mesos 0.20.0`_ docs page.
+
 ------------
 Installation
 ------------
@@ -198,3 +201,4 @@ The packaged version of Mesos can also load these options from files:
 
 .. _`this article`: https://mesosphere.io/learn/run-docker-on-mesosphere/
 
+.. _`Docker in Mesos 0.20.0`: http://mesos.apache.org/documentation/latest/docker-containerizer/
