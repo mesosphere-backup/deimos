@@ -5,7 +5,7 @@ deimos
 Deimos is a Docker plugin for Mesos, providing external containerization as
 described in `MESOS-816`_.
 
-NOTE: Mesos 0.20.0 shipped with built in Docker support and this project is no longer actively maintained.
+NOTE: Mesos 0.20.0 shipped with built-in Docker support and this project is no longer actively maintained.
 More info on the `Docker in Mesos 0.20.0`_ docs page.
 
 ------------
@@ -41,9 +41,7 @@ of an *image URL* and *container options*. For example:
 
 Deimos handles image URLs beginning with ``docker:///`` by stripping the
 prefix and using the remainder as the image name. The container options are
-passed to ``docker run`` when the task is launched. If a ``//`` is found in the 
-options list, all the following arguments will be append to the the end of 
-the run command. This is useful when using an image with an entrypoint defined.
+passed to ``docker run`` when the task is launched. If a ``//`` is found in the options list, all the following arguments will be appended to the end of the run command. This is useful when using an image with an entry point defined.
 For example:
 
 .. code-block:: c
@@ -62,7 +60,7 @@ a reasonable guess based on the host's distribution and release.
 Some options for Docker, like ``-H``, do not apply only to ``docker run``.
 These options should be set in the Deimos configuration file.
 
-Deimos recognizes Mesos resources that specify ports, CPUs and memory and
+Deimos recognizes Mesos resources that specify ports, CPUs, and memory and
 translates them to appropriate Docker options.
 
 
@@ -70,7 +68,7 @@ translates them to appropriate Docker options.
 Passing Parameters through Marathon
 -----------------------------------
 
-Marathon has a REST api to submit JSON-formatted requests to run long-running commands.
+Marathon has a REST API to submit JSON-formatted requests to run long-running commands.
 
 From this JSON object, the following keys are used by Deimos:
 
